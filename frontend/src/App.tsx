@@ -2,7 +2,14 @@ import { GridCanvas } from './canvas/GridCanvas';
 
 function App() {
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-white flex flex-col justify-center items-center p-6 select-none">
+    <div className="min-h-screen bg-[#0d0d0d] text-white flex flex-col justify-center items-center p-6 select-none relative">
+      {/* Logo */}
+      <img
+        src="/gridlab_logo.png"
+        alt="GridLab"
+        style={{ height: '40px', width: 'auto' }}
+        className="fixed top-6 left-6"
+      />
       {/* Title */}
       <header className="mb-8 text-center">
         <h1 className="text-2xl font-bold tracking-wider text-[#ffd700] uppercase font-mono">
