@@ -21,6 +21,7 @@ interface SolveResult {
 
 interface GridCanvasProps {
   size?: number;
+  theme?: 'dark' | 'light';
 }
 
 interface AlgorithmOption {
@@ -78,7 +79,7 @@ const SPEED_DELAY = [50, 20, 5]; // Slow=50ms, Medium=20ms, Fast=5ms
 const SPEED_LABELS = ['SLOW', 'MEDIUM', 'FAST'];
 const PATH_DELAY = 30; // Fixed 30ms
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
+export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -116,6 +117,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
   const isAnimatingRef = useRef(false);
   const dimensionsRef = useRef(dimensions);
   const speedRef = useRef(speed);
+  const themeRef = useRef(theme);
 
   useEffect(() => {
     dimensionsRef.current = dimensions;
@@ -124,6 +126,10 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
   useEffect(() => {
     speedRef.current = speed;
   }, [speed]);
+
+  useEffect(() => {
+    themeRef.current = theme;
+  }, [theme]);
 
   // Fetch grid
   useEffect(() => {
@@ -218,7 +224,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = color;
     ctx.fillRect(x1, y1, w, w);
-    ctx.strokeStyle = '#1a1a1a';
+    ctx.strokeStyle = themeRef.current === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x1, y1, w, w);
     ctx.restore();
@@ -359,7 +365,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
     canvas.style.height = `${S}px`;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = '#0d0d0d';
+    ctx.fillStyle = theme === 'dark' ? '#0d0d0d' : '#f5f5f5';
     ctx.fillRect(0, 0, S, S);
 
     if (error) {
@@ -377,12 +383,14 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         const isWall = !loading && grid.length > 0 && grid[r]?.[c] === 1;
+        const wallColor = theme === 'dark' ? '#111111' : '#787878';
+        const openColor = theme === 'dark' ? '#2d2d2d' : '#b0b0b0';
         if (startPoint && startPoint.r === r && startPoint.c === c) {
           ctx.fillStyle = '#00e676';
         } else if (endPoint && endPoint.r === r && endPoint.c === c) {
           ctx.fillStyle = '#ff1744';
         } else {
-          ctx.fillStyle = isWall ? '#111111' : '#2d2d2d';
+          ctx.fillStyle = isWall ? wallColor : openColor;
         }
         const x1 = (c * S) / size;
         const y1 = (r * S) / size;
@@ -392,7 +400,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
       }
     }
 
-    ctx.strokeStyle = '#1a1a1a';
+    ctx.strokeStyle = theme === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.15)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i <= size; i++) {
@@ -403,7 +411,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
     ctx.stroke();
 
     if (loading) {
-      ctx.fillStyle = 'rgba(13,13,13,0.6)';
+      ctx.fillStyle = theme === 'dark' ? 'rgba(13,13,13,0.6)' : 'rgba(245,245,245,0.6)';
       ctx.fillRect(0, 0, S, S);
       ctx.fillStyle = '#ffd700';
       ctx.font = '14px "JetBrains Mono","Fira Code",monospace';
@@ -416,15 +424,15 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
   useEffect(() => {
     if (isAnimating || showStats) return;
     drawBaseGrid();
-  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats]);
+  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats, theme]);
 
   return (
-    <div className="w-full flex flex-col items-center gap-6 font-mono text-white select-none">
+    <div className={`w-full flex flex-col items-center gap-6 font-mono select-none ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>
       
       {/* Canvas visualizer */}
       <div
         ref={containerRef}
-        className="w-full aspect-square max-w-[600px] bg-[#0d0d0d] overflow-hidden border border-[#1a1a1a] relative flex items-center justify-center"
+        className={`w-full aspect-square max-w-[600px] overflow-hidden relative flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#0d0d0d] border border-[#1a1a1a]' : 'bg-[#e2e2e2] border border-[rgba(0,0,0,0.15)]'}`}
       >
         <canvas
           ref={canvasRef}
@@ -456,7 +464,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
                 onChange={e => setSpeed(Number(e.target.value))}
                 className="flex-1 h-1 appearance-none rounded-full outline-none cursor-pointer"
                 style={{
-                  background: `linear-gradient(to right, #f5c518 ${speed * 50}%, #2a2a2a ${speed * 50}%)`
+                  background: `linear-gradient(to right, #f5c518 ${speed * 50}%, ${theme === 'dark' ? '#2a2a2a' : '#d0d0d0'} ${speed * 50}%)`
                 }}
               />
               <span className="text-[8px] text-gray-600 tracking-widest uppercase">
@@ -473,7 +481,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
         {/* Reset button with SVG rotation */}
         <button
           onClick={handleReset}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-[#f5c518] hover:bg-[#222222] hover:text-[#ffd700] active:scale-95 transition-all duration-200 focus:outline-none"
+          className={`flex items-center justify-center w-10 h-10 rounded-full text-[#f5c518] active:scale-95 transition-all duration-200 focus:outline-none ${
+            theme === 'dark'
+              ? 'bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#222222] hover:text-[#ffd700]'
+              : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)] hover:bg-[#c8c8c8] hover:text-[#ffd700]'
+          }`}
           title="Reset Grid"
         >
           <motion.svg
@@ -495,9 +507,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
           <button
             onClick={() => setIsDropdownOpen(prev => !prev)}
             disabled={isAnimating}
-            className="flex items-center justify-between w-full px-4 h-10 bg-[#1a1a1a] border border-[#2a2a2a] rounded text-[11px] font-mono tracking-wider uppercase text-left transition-all duration-200 hover:bg-[#222222] disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`flex items-center justify-between w-full px-4 h-10 rounded text-[11px] font-mono tracking-wider uppercase text-left transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
+              theme === 'dark'
+                ? 'bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#222222]'
+                : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)] hover:bg-[#c8c8c8]'
+            }`}
           >
-            <span className={selectedAlgo ? 'text-white' : 'text-gray-500'}>
+            <span className={selectedAlgo ? (theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]') : 'text-gray-500'}>
               {selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}
             </span>
             <svg
@@ -515,13 +531,21 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute bottom-full mb-2 left-0 w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded overflow-hidden shadow-2xl flex flex-col z-50"
+                className={`absolute bottom-full mb-2 left-0 w-full rounded overflow-hidden shadow-2xl flex flex-col z-50 ${
+                  theme === 'dark'
+                    ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
+                    : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
+                }`}
               >
                 {ALGORITHMS.map(algo => (
                   <button
                     key={algo.id}
                     onClick={() => { setSelectedAlgo(algo); setIsDropdownOpen(false); }}
-                    className={`flex items-center justify-between w-full px-4 py-2.5 text-left transition-all duration-150 border-b border-[#2a2a2a]/40 last:border-b-0 hover:bg-[#222222] ${selectedAlgo?.id === algo.id ? 'bg-[#222222] text-[#ffd700]' : 'text-gray-300'}`}
+                    className={`flex items-center justify-between w-full px-4 py-2.5 text-left transition-all duration-150 last:border-b-0 ${
+                      theme === 'dark'
+                        ? `border-b border-[#2a2a2a]/40 hover:bg-[#222222] ${selectedAlgo?.id === algo.id ? 'bg-[#222222] text-[#ffd700]' : 'text-gray-300'}`
+                        : `border-b border-[rgba(0,0,0,0.15)]/40 hover:bg-[#c8c8c8] ${selectedAlgo?.id === algo.id ? 'bg-[#c8c8c8] text-[#1a1a1a] font-bold' : 'text-[#1a1a1a]'}`
+                    }`}
                   >
                     <span className="text-[10px] font-bold uppercase">{algo.name}</span>
                     <span
@@ -542,10 +566,12 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
           <button
             disabled={isRunDisabled}
             onClick={handleRun}
-            className={`px-6 h-10 rounded bg-[#1a1a1a] border font-bold text-[11px] tracking-widest transition-all duration-200 ${
+            className={`px-6 h-10 rounded border font-bold text-[11px] tracking-widest transition-all duration-200 ${
               isRunDisabled
-                ? 'opacity-30 border-[#2a2a2a] text-gray-500 cursor-not-allowed'
-                : 'opacity-100 border-[#f5c518] text-[#f5c518] hover:bg-[#f5c518] hover:text-[#0d0d0d] active:scale-95 cursor-pointer'
+                ? (theme === 'dark'
+                    ? 'opacity-30 bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 cursor-not-allowed'
+                    : 'opacity-30 bg-[#d0d0d0] border-[rgba(0,0,0,0.15)] text-gray-500 cursor-not-allowed')
+                : 'opacity-100 border-[#f5c518] text-[#f5c518] hover:bg-[#f5c518] hover:text-[#1a1a1a] active:scale-95 cursor-pointer'
             }`}
           >
             {isFetching ? (
@@ -563,7 +589,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 onClick={handleStop}
-                className="px-4 h-10 rounded bg-[#1a1a1a] border border-[#ff1744]/60 text-[#ff1744] text-[11px] font-bold tracking-widest uppercase hover:bg-[#ff1744]/10 active:scale-95 transition-all duration-150"
+                className={`px-4 h-10 rounded border border-[#ff1744]/60 text-[#ff1744] text-[11px] font-bold tracking-widest uppercase hover:bg-[#ff1744]/10 active:scale-95 transition-all duration-150 ${
+                  theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#d0d0d0]'
+                }`}
               >
                 STOP
               </motion.button>
@@ -626,9 +654,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
               className="grid grid-cols-4 gap-4 w-full"
             >
               {/* ALGORITHM card */}
-              <div className="flex flex-col items-center justify-center p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded">
+              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
+                theme === 'dark'
+                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
+                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
+              }`}>
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-[10px] font-bold text-white uppercase">{selectedAlgo?.name}</span>
+                  <span className={`text-[10px] font-bold uppercase ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>{selectedAlgo?.name}</span>
                   <span
                     style={{ color: selectedAlgo?.badgeColor, backgroundColor: selectedAlgo?.badgeBg, borderColor: `${selectedAlgo?.badgeColor}26` }}
                     className="text-[6px] font-mono tracking-widest px-0.5 py-0.2 rounded border uppercase font-bold"
@@ -642,7 +674,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
               </div>
 
               {/* NODES VISITED card */}
-              <div className="flex flex-col items-center justify-center p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded">
+              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
+                theme === 'dark'
+                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
+                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
+              }`}>
                 <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
                   {solveResult.nodesVisited}
                 </span>
@@ -650,9 +686,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
                   NODES VISITED
                 </span>
               </div>
-
+ 
               {/* PATH LENGTH card */}
-              <div className="flex flex-col items-center justify-center p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded">
+              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
+                theme === 'dark'
+                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
+                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
+              }`}>
                 <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
                   {solveResult.pathLength}
                 </span>
@@ -660,9 +700,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60 }) => {
                   PATH LENGTH
                 </span>
               </div>
-
+ 
               {/* TIME TAKEN card */}
-              <div className="flex flex-col items-center justify-center p-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded">
+              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
+                theme === 'dark'
+                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
+                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
+              }`}>
                 <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
                   {solveResult.timeTaken.toFixed(2)}ms
                 </span>
