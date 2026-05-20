@@ -427,56 +427,61 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats, theme]);
 
   return (
-    <div className={`w-full flex flex-col items-center gap-6 font-mono select-none ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>
+    <div className={`w-full h-full flex flex-row font-mono select-none ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>
       
-      {/* Canvas visualizer */}
-      <div
-        ref={containerRef}
-        className={`w-full aspect-square max-w-[600px] overflow-hidden relative flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#0d0d0d] border border-[#1a1a1a]' : 'bg-[#e2e2e2] border border-[rgba(0,0,0,0.15)]'}`}
-      >
-        <canvas
-          ref={canvasRef}
-          onClick={handleCanvasClick}
-          className={`block ${isAnimating ? 'cursor-default' : 'cursor-crosshair'}`}
-        />
+      {/* Left: Canvas visualizer — 55% width, padded from left edge */}
+      <div className="w-[55%] h-full flex items-center pl-[150px] pr-6 py-6">
+        <div
+          ref={containerRef}
+          className={`h-[80vh] max-h-full max-w-full aspect-square overflow-hidden relative flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#0d0d0d] border border-[#1a1a1a]' : 'bg-[#e2e2e2] border border-[rgba(0,0,0,0.15)]'}`}
+        >
+          <canvas
+            ref={canvasRef}
+            onClick={handleCanvasClick}
+            className={`block ${isAnimating ? 'cursor-default' : 'cursor-crosshair'}`}
+          />
+        </div>
       </div>
 
-      {/* Speed Slider (only visible while animating) */}
-      <div className="min-h-[40px] flex items-center justify-center w-full">
-        <AnimatePresence>
-          {isAnimating && (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center justify-center gap-4 w-full max-w-[320px]"
-            >
-              <span className="text-[10px] tracking-widest uppercase text-gray-500 w-16 text-right">
-                {SPEED_LABELS[speed]}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={2}
-                step={1}
-                value={speed}
-                onChange={e => setSpeed(Number(e.target.value))}
-                className="flex-1 h-1 appearance-none rounded-full outline-none cursor-pointer"
-                style={{
-                  background: `linear-gradient(to right, #f5c518 ${speed * 50}%, ${theme === 'dark' ? '#2a2a2a' : '#d0d0d0'} ${speed * 50}%)`
-                }}
-              />
-              <span className="text-[8px] text-gray-600 tracking-widest uppercase">
-                S/M/F
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      {/* Right: Controls + Stats — 45% width, content vertically centered */}
+      <div className="w-[45%] flex flex-col justify-center pr-12 gap-6">
 
-      {/* Control row: Reset button, dropdown, RUN button */}
-      <div className="flex items-center justify-center gap-4 w-full max-w-[600px] relative z-40">
+        {/* Speed Slider (only visible while animating) */}
+        <div className="min-h-[40px] flex items-center justify-center w-full">
+          <AnimatePresence>
+            {isAnimating && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center justify-center gap-4 w-full"
+              >
+                <span className="text-[10px] tracking-widest uppercase text-gray-500 w-16 text-right">
+                  {SPEED_LABELS[speed]}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={1}
+                  value={speed}
+                  onChange={e => setSpeed(Number(e.target.value))}
+                  className="flex-1 h-1 appearance-none rounded-full outline-none cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #f5c518 ${speed * 50}%, ${theme === 'dark' ? '#2a2a2a' : '#d0d0d0'} ${speed * 50}%)`
+                  }}
+                />
+                <span className="text-[8px] text-gray-600 tracking-widest uppercase">
+                  S/M/F
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Control row: Reset button, dropdown, RUN button */}
+        <div className="flex items-center justify-center gap-4 w-full relative z-40">
         
         {/* Reset button with SVG rotation */}
         <button
@@ -598,10 +603,10 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             )}
           </AnimatePresence>
         </div>
-      </div>
+        </div>
 
-      {/* Description & Errors */}
-      <div className="w-full max-w-[600px] min-h-[40px] flex flex-col gap-2 items-center">
+        {/* Description & Errors */}
+        <div className="w-full min-h-[40px] flex flex-col gap-2 items-center">
         {/* Selected Algorithm Description */}
         <AnimatePresence mode="wait">
           {selectedAlgo && !isAnimating && (
@@ -640,10 +645,10 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+        </div>
 
-      {/* Stats Panel (appears below controls Row, fades in post-animation) */}
-      <div className="w-full max-w-[600px] min-h-[80px]">
+        {/* Stats Panel (appears below controls Row, fades in post-animation) */}
+        <div className="w-full min-h-[80px]">
         <AnimatePresence>
           {showStats && solveResult && (
             <motion.div
@@ -717,8 +722,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+        </div>
 
+      </div>
     </div>
   );
 };

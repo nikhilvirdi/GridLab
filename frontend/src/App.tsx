@@ -7,7 +7,7 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   return (
-    <div className={`min-h-screen flex flex-col justify-center items-center p-6 select-none relative transition-colors duration-300 ${
+    <div className={`h-screen overflow-hidden flex flex-col select-none transition-colors duration-300 ${
       theme === 'dark' ? 'bg-[#0d0d0d] text-white' : 'bg-[#e2e2e2] text-[#1a1a1a]'
     }`}>
       {/* Floating pill-shaped Navbar */}
@@ -79,32 +79,17 @@ function App() {
         </AnimatePresence>
       </button>
 
-      {activeTab === 'visualizer' ? (
-        <>
-          {/* Title */}
-          <header className="mb-8 text-center">
-            <h1 className="text-2xl font-bold tracking-wider text-[#ffd700] uppercase font-mono">
-              GRIDLAB
-            </h1>
-            <p className="text-xs text-gray-500 mt-1 uppercase font-mono tracking-widest">
-              Base Grid Canvas Visualizer
-            </p>
-          </header>
-
-          {/* Main Canvas Component Container */}
-          <main className="w-full max-w-[600px] flex justify-center items-center">
+      {/* Page content — sits below fixed navbar */}
+      <div className="flex-1 pt-[70px] overflow-hidden">
+        {activeTab === 'visualizer' ? (
+          <div className="h-full w-full">
             <GridCanvas size={60} theme={theme} />
-          </main>
-
-          {/* Footer */}
-          <footer className="mt-8 text-[10px] text-gray-600 font-mono tracking-wider">
-            GRID RES: 60x60 | WALL RATIO: ~30%
-          </footer>
-        </>
-      ) : (
-        /* Empty placeholder for Documentation tab as instructed */
-        <div className="w-full max-w-[600px] h-[50vh]" />
-      )}
+          </div>
+        ) : (
+          /* Empty placeholder for Documentation tab as instructed */
+          <div className="h-full" />
+        )}
+      </div>
     </div>
   );
 }
