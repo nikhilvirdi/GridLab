@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: #0d0d0d;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  overflow-x: hidden;
+}
+
+/* Custom scanline or noise overlay if we want, but we can configure simple scrollbars too */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0d0d0d;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #333333;
+}
+
+/* ── Speed slider ── */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5c518;
+  border: 2px solid #0d0d0d;
+  box-shadow: 0 0 6px rgba(245, 197, 24, 0.5);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 10px rgba(245, 197, 24, 0.7);
+}
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5c518;
+  border: 2px solid #0d0d0d;
+  box-shadow: 0 0 6px rgba(245, 197, 24, 0.5);
+  cursor: pointer;
+}
