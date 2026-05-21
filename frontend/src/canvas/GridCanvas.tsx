@@ -88,9 +88,9 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   greedy: 'O(E log V)',
 };
 
-const GRID_PX = 520;
+const GRID_PX = 640;
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
+export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -465,7 +465,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          paddingRight: '60px',
+          paddingRight: '52px',
           flexShrink: 0,
         }}
       >
@@ -480,6 +480,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             borderRadius: '4px',
             overflow: 'hidden',
             position: 'relative',
+            padding: 0,
+            margin: 0,
           }}
         >
           <canvas
@@ -487,8 +489,10 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             onClick={handleCanvasClick}
             style={{
               display: 'block',
-              width: `${gridSizePx}px`,
-              height: `${gridSizePx}px`,
+              width: '100%',
+              height: '100%',
+              margin: 0,
+              padding: 0,
               cursor: isAnimating ? 'default' : 'crosshair',
             }}
           />
@@ -504,7 +508,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
           flexDirection: 'column',
           alignItems: 'flex-start',
           justifyContent: 'center',
-          paddingLeft: '60px',
+          paddingLeft: '12px',
           flexShrink: 0,
         }}
       >

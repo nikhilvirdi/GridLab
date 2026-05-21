@@ -145,8 +145,8 @@ function App() {
       {/* Main content — two column layout */}
       <div
         style={{
-          paddingTop: '80px',
-          height: 'calc(100vh - 80px)',
+          paddingTop: '56px',
+          height: 'calc(100vh - 56px)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'row',
@@ -154,7 +154,7 @@ function App() {
         }}
       >
         {activeTab === 'visualizer' ? (
-          <GridCanvas size={60} theme={theme} />
+          <GridCanvas size={80} theme={theme} />
         ) : (
           <div style={{ width: '100%', height: '100%' }} />
         )}

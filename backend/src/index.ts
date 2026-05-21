@@ -28,7 +28,7 @@ app.use(express.json({ limit: '5mb' }));
 app.get('/api/maze', (req: Request, res: Response) => {
   try {
     const sizeParam = req.query.size;
-    const size = sizeParam ? parseInt(sizeParam as string, 10) : 60;
+    const size = sizeParam ? parseInt(sizeParam as string, 10) : 80;
 
     if (isNaN(size) || size < 2 || size > 200) {
       res.status(400).json({ error: 'Size must be an integer between 2 and 200.' });
