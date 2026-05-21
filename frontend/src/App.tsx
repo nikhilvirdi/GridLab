@@ -17,7 +17,7 @@ function App() {
         color: isDark ? '#ffffff' : '#000000',
       }}
     >
-      {/* Logo */}
+      {/* Logo — fixed top-left */}
       <img
         src={isDark ? '/gridlab_logo.png' : '/gridlab_logo_lighttheme.png'}
         alt="GridLab"
@@ -25,11 +25,11 @@ function App() {
         style={{ top: '24px', left: '32px', height: '56px', width: 'auto' }}
       />
 
-      {/* Navbar */}
+      {/* Floating pill navbar — fixed top-center */}
       <div
         className="fixed left-1/2 z-50 flex items-center"
         style={{
-          top: '20px',
+          top: '16px',
           transform: 'translateX(-50%)',
           backgroundColor: isDark ? '#111111' : '#e0e0e0',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
@@ -49,15 +49,11 @@ function App() {
             fontSize: '15px',
             backgroundColor:
               activeTab === 'visualizer'
-                ? isDark
-                  ? '#000000'
-                  : '#f0f0f0'
+                ? isDark ? '#000000' : '#f0f0f0'
                 : 'transparent',
             color:
               activeTab === 'visualizer'
-                ? isDark
-                  ? '#ffffff'
-                  : '#000000'
+                ? isDark ? '#ffffff' : '#000000'
                 : '#888888',
           }}
         >
@@ -74,15 +70,11 @@ function App() {
             fontSize: '15px',
             backgroundColor:
               activeTab === 'documentation'
-                ? isDark
-                  ? '#000000'
-                  : '#f0f0f0'
+                ? isDark ? '#000000' : '#f0f0f0'
                 : 'transparent',
             color:
               activeTab === 'documentation'
-                ? isDark
-                  ? '#ffffff'
-                  : '#000000'
+                ? isDark ? '#ffffff' : '#000000'
                 : '#888888',
           }}
         >
@@ -90,14 +82,14 @@ function App() {
         </button>
       </div>
 
-      {/* Theme toggle */}
+      {/* Theme toggle — fixed top-right */}
       <button
         onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         aria-label="Toggle Theme"
         className="fixed z-50 flex items-center justify-center"
         style={{
           top: '24px',
-          right: '24px',
+          right: '32px',
           width: '44px',
           height: '44px',
           borderRadius: '50%',
@@ -150,7 +142,7 @@ function App() {
         </AnimatePresence>
       </button>
 
-      {/* Main content */}
+      {/* Main content — two column layout */}
       <div
         style={{
           paddingTop: '80px',

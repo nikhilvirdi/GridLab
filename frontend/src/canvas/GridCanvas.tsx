@@ -76,8 +76,8 @@ const ALGORITHMS: AlgorithmOption[] = [
   }
 ];
 
-const SPEED_DELAY = [50, 20, 5]; // Slow=50ms, Medium=20ms, Fast=5ms
-const PATH_DELAY = 30; // Fixed 30ms
+const SPEED_DELAY = [50, 20, 5];
+const PATH_DELAY = 30;
 
 const ALGO_COMPLEXITY: Record<string, string> = {
   bfs: 'O(V + E)',
@@ -87,6 +87,8 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   'bidirectional-bfs': 'O(b^(d/2))',
   greedy: 'O(E log V)',
 };
+
+const GRID_PX = 520;
 
 export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -100,8 +102,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   const [grid, setGrid]           = useState<number[][]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [gridSizePx, setGridSizePx] = useState(0);
+  const [dimensions, setDimensions] = useState({ width: GRID_PX, height: GRID_PX });
+  const [gridSizePx] = useState(GRID_PX);
 
   // Points
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -117,7 +119,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   const [isAnimating, setIsAnimating] = useState(false);
   const [noPathFound, setNoPathFound] = useState(false);
   const [invalidPlacement, setInvalidPlacement] = useState(false);
-  const [speed, setSpeed]             = useState(1); // 0=Slow 1=Med 2=Fast
+  const [speed, setSpeed]             = useState(1);
   const [solveResult, setSolveResult] = useState<SolveResult | null>(null);
   const [showStats, setShowStats]         = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
@@ -125,23 +127,14 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating;
   const isDark = theme === 'dark';
 
-  // Refs for mirroring states to prevent stale closure & render race conditions
   const isAnimatingRef = useRef(false);
   const dimensionsRef = useRef(dimensions);
   const speedRef = useRef(speed);
   const themeRef = useRef(theme);
 
-  useEffect(() => {
-    dimensionsRef.current = dimensions;
-  }, [dimensions]);
-
-  useEffect(() => {
-    speedRef.current = speed;
-  }, [speed]);
-
-  useEffect(() => {
-    themeRef.current = theme;
-  }, [theme]);
+  useEffect(() => { dimensionsRef.current = dimensions; }, [dimensions]);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
+  useEffect(() => { themeRef.current = theme; }, [theme]);
 
   // Fetch grid
   useEffect(() => {
@@ -173,26 +166,12 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Compute explicit square grid size (~520px with breathing room per reference)
+  // Fixed 520px grid — no resize needed
   useEffect(() => {
-    const compute = () => {
-      const contentH = window.innerHeight - 80;
-      const colW = window.innerWidth * 0.55;
-      const px = Math.min(
-        520,
-        Math.floor(colW - 200),
-        Math.floor(contentH - 160)
-      );
-      const size = Math.max(px, 280);
-      setGridSizePx(size);
-      setDimensions({ width: size, height: size });
-    };
-    compute();
-    window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    setDimensions({ width: GRID_PX, height: GRID_PX });
   }, []);
 
-  // Canvas click handler
+  // Canvas click handler — DO NOT MODIFY
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (loading || error || grid.length === 0 || isAnimating) return;
     if (startPoint && endPoint) return;
@@ -213,7 +192,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     }
   };
 
-  // Reset
+  // Reset — DO NOT MODIFY
   const handleReset = () => {
     animStopRef.current = true;
     isAnimatingRef.current = false;
@@ -229,7 +208,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     setRotation(prev => prev + 360);
   };
 
-  // Paint a single cell directly on canvas
+  // Paint a single cell directly on canvas — DO NOT MODIFY
   const paintCell = (row: number, col: number, color: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -251,7 +230,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     ctx.restore();
   };
 
-  // Animation engine
+  // Animation engine — DO NOT MODIFY
   const runAnimation = (data: SolveResult, start: Point, end: Point) => {
     animStopRef.current = false;
     isAnimatingRef.current = true;
@@ -324,7 +303,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     setIsAnimating(false);
   };
 
-  // Run solver
+  // Run solver — DO NOT MODIFY
   const handleRun = async () => {
     if (isRunDisabled || !selectedAlgo || !startPoint || !endPoint) return;
     const slug = ALGO_SLUG[selectedAlgo.id];
@@ -370,7 +349,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     }
   };
 
-  // Draw base grid
+  // Draw base grid — DO NOT MODIFY
   const drawBaseGrid = () => {
     if (isAnimatingRef.current) return;
     const canvas = canvasRef.current;
@@ -448,20 +427,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     drawBaseGrid();
   }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats, theme]);
 
-  const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
-  const panelBg = isDark ? '#111111' : '#e0e0e0';
-  const statsPanelBg = isDark ? '#0d0d0d' : '#e8e8e8';
-  const valueBoxBg = isDark ? '#1a1a1a' : '#d8d8d8';
+  // ─── Styling tokens ───────────────────────────────────────────────────────
+  const borderColor  = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  const panelBg      = isDark ? '#111111' : '#e0e0e0';
+  const valueBoxBg   = isDark ? '#1a1a1a' : '#d8d8d8';
 
-  const CONTENT_W = 420;
-  const CTRL_H = 48;
+  const CONTENT_W   = 420;
+  const CTRL_H      = 48;
   const SECTION_GAP = 28;
-  const DROPDOWN_W = 260;
+  const DROPDOWN_W  = 260;
 
   return (
     <div
-      className="flex flex-row font-mono select-none min-h-0"
-      style={{ width: '100%', height: '100%', flex: 1 }}
+      className="flex flex-row font-mono select-none"
+      style={{ width: '100%', height: '100%' }}
     >
       {/* Fullscreen loader */}
       <AnimatePresence>
@@ -478,26 +457,28 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
         )}
       </AnimatePresence>
 
-      {/* Left column — 55%, grid centered with breathing room */}
+      {/* ── Left column — 55%, grid centered flush-right with padding ── */}
       <div
         style={{
           width: '55%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'flex-end',
+          paddingRight: '60px',
           flexShrink: 0,
-          backgroundColor: isDark ? '#000000' : '#f0f0f0',
         }}
       >
+        {/* Grid container — exactly 520×520px, never percentage */}
         <div
           ref={containerRef}
           style={{
-            width: gridSizePx > 0 ? `${gridSizePx}px` : undefined,
-            height: gridSizePx > 0 ? `${gridSizePx}px` : undefined,
-            backgroundColor: isDark ? '#000000' : '#f0f0f0',
-            overflow: 'hidden',
+            width: `${GRID_PX}px`,
+            height: `${GRID_PX}px`,
             flexShrink: 0,
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            borderRadius: '4px',
+            overflow: 'hidden',
             position: 'relative',
           }}
         >
@@ -506,46 +487,40 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             onClick={handleCanvasClick}
             style={{
               display: 'block',
-              width: gridSizePx > 0 ? `${gridSizePx}px` : '100%',
-              height: gridSizePx > 0 ? `${gridSizePx}px` : '100%',
+              width: `${gridSizePx}px`,
+              height: `${gridSizePx}px`,
               cursor: isAnimating ? 'default' : 'crosshair',
             }}
           />
         </div>
       </div>
 
-      {/* Right column — 45%, content vertically centered */}
+      {/* ── Right column — 45%, controls start at grid top ── */}
       <div
         style={{
           width: '45%',
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'center',
+          paddingLeft: '60px',
           flexShrink: 0,
         }}
       >
         <div
           style={{
             width: `${CONTENT_W}px`,
-            maxWidth: `${CONTENT_W}px`,
             display: 'flex',
             flexDirection: 'column',
             gap: `${SECTION_GAP}px`,
-            alignItems: 'stretch',
           }}
         >
-          {/* Controls row */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: '16px',
-            }}
-          >
-            {/* Reset */}
+
+          {/* ── Controls row: Reset | Dropdown | RUN ── */}
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px' }}>
+
+            {/* Reset button */}
             <button
               onClick={handleReset}
               title="Reset Grid"
@@ -583,7 +558,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
               </motion.svg>
             </button>
 
-            {/* Dropdown */}
+            {/* Algorithm dropdown */}
             <div ref={dropdownRef} style={{ position: 'relative', width: `${DROPDOWN_W}px`, flexShrink: 0 }}>
               <button
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
@@ -601,12 +576,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   cursor: isAnimating ? 'not-allowed' : 'pointer',
                   opacity: isAnimating ? 0.3 : 1,
                   fontFamily: 'inherit',
-                  fontSize: '15px',
-                  textTransform: 'uppercase',
+                  fontSize: '14px',
                   color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : '#888888',
                 }}
               >
-                <span>{selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}</span>
+                <span>{selectedAlgo ? selectedAlgo.name : 'Select Algorithm'}</span>
                 <svg
                   width="16"
                   height="16"
@@ -624,6 +598,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 </svg>
               </button>
 
+              {/* Dropdown menu — opens upward */}
               <AnimatePresence>
                 {isDropdownOpen && (
                   <motion.div
@@ -665,16 +640,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                               : 'none',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
-                          fontSize: '15px',
-                          textTransform: 'uppercase',
+                          fontSize: '14px',
                           color:
                             selectedAlgo?.id === algo.id
-                              ? isDark
-                                ? '#ffffff'
-                                : '#000000'
-                              : isDark
-                                ? '#cccccc'
-                                : '#444444',
+                              ? isDark ? '#ffffff' : '#000000'
+                              : isDark ? '#cccccc' : '#444444',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
@@ -683,7 +653,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                           e.currentTarget.style.backgroundColor = panelBg;
                         }}
                       >
-                        <span>{algo.name}</span>
+                        <span>{algo.name} ({algo.tag})</span>
                         <span
                           style={{
                             fontSize: '9px',
@@ -701,7 +671,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
               </AnimatePresence>
             </div>
 
-            {/* RUN */}
+            {/* RUN button */}
             <button
               disabled={isRunDisabled}
               onClick={handleRun}
@@ -714,9 +684,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   ? `1px solid ${borderColor}`
                   : '1px solid rgba(0,230,118,0.4)',
                 fontFamily: 'inherit',
-                fontSize: '15px',
-                fontWeight: 400,
-                textTransform: 'uppercase',
+                fontSize: '14px',
+                fontWeight: 700,
                 color: '#00e676',
                 cursor: isRunDisabled ? 'not-allowed' : 'pointer',
                 opacity: isRunDisabled ? 0.3 : 1,
@@ -735,19 +704,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   fill="none"
                   viewBox="0 0 24 24"
                 >
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke={isDark ? '#ffffff' : '#000000'}
-                    strokeWidth="3"
-                    opacity="0.25"
-                  />
-                  <path
-                    fill={isDark ? '#ffffff' : '#000000'}
-                    opacity="0.75"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
+                  <circle cx="12" cy="12" r="10" stroke="#00e676" strokeWidth="3" opacity="0.25" />
+                  <path fill="#00e676" opacity="0.75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                 </svg>
               ) : (
                 'RUN'
@@ -755,7 +713,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             </button>
           </div>
 
-          {/* Algorithm description */}
+          {/* ── Algorithm description — fades in on selection ── */}
           <AnimatePresence mode="wait">
             {selectedAlgo && (
               <motion.p
@@ -766,9 +724,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 transition={{ duration: 0.2 }}
                 style={{
                   fontSize: '13px',
-                  color: '#aaaaaa',
+                  color: '#888888',
                   fontFamily: 'inherit',
-                  textTransform: 'uppercase',
                   lineHeight: 1.45,
                   margin: 0,
                   display: '-webkit-box',
@@ -782,7 +739,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             )}
           </AnimatePresence>
 
-          {/* Speed slider + STOP */}
+          {/* ── Speed slider + STOP — visible during animation only ── */}
           <AnimatePresence>
             {isAnimating && (
               <motion.div
@@ -795,10 +752,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   alignItems: 'center',
                   gap: '12px',
                   width: '100%',
-                  marginTop: '20px',
                 }}
               >
-                <span style={{ fontSize: '13px', color: '#888888', flexShrink: 0 }}>S</span>
+                <span style={{ fontSize: '12px', color: '#888888', flexShrink: 0 }}>S</span>
                 <input
                   type="range"
                   min={0}
@@ -809,19 +765,18 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   className={isDark ? 'speed-slider' : 'speed-slider-light'}
                   style={{ flex: 1 }}
                 />
-                <span style={{ fontSize: '13px', color: '#888888', flexShrink: 0 }}>F</span>
+                <span style={{ fontSize: '12px', color: '#888888', flexShrink: 0 }}>F</span>
                 <button
                   onClick={handleStop}
                   style={{
-                    height: '36px',
+                    height: '40px',
                     padding: '0 16px',
                     borderRadius: '8px',
                     backgroundColor: panelBg,
                     border: '1px solid rgba(255,0,0,0.3)',
                     color: '#ff1744',
                     fontFamily: 'inherit',
-                    fontSize: '15px',
-                    textTransform: 'uppercase',
+                    fontSize: '14px',
                     cursor: 'pointer',
                     flexShrink: 0,
                   }}
@@ -832,7 +787,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             )}
           </AnimatePresence>
 
-          {/* See Stats + panel */}
+          {/* ── See Stats button + stats panel — post-run only ── */}
           <AnimatePresence>
             {(showStats || noPathFound || invalidPlacement) && (
               <motion.div
@@ -842,26 +797,25 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 transition={{ duration: 0.2 }}
                 style={{ display: 'flex', flexDirection: 'column', gap: `${SECTION_GAP}px`, width: '100%' }}
               >
+                {/* See Stats button */}
                 <button
                   onClick={() => setStatsPanelOpen((prev) => !prev)}
                   style={{
-                    width: '100%',
+                    width: `${CONTENT_W}px`,
                     height: `${CTRL_H}px`,
                     borderRadius: '10px',
                     backgroundColor: panelBg,
-                    border: isDark
-                      ? '1px solid rgba(255,255,255,0.2)'
-                      : `1px solid ${borderColor}`,
+                    border: `1px solid ${borderColor}`,
                     color: isDark ? '#ffffff' : '#000000',
                     fontFamily: 'inherit',
                     fontSize: '15px',
-                    textTransform: 'uppercase',
                     cursor: 'pointer',
                   }}
                 >
-                  SEE STATS
+                  See Stats
                 </button>
 
+                {/* Stats panel */}
                 <AnimatePresence>
                   {statsPanelOpen && (
                     <motion.div
@@ -873,7 +827,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                         width: `${CONTENT_W}px`,
                         borderRadius: '12px',
                         border: `1px solid ${borderColor}`,
-                        backgroundColor: statsPanelBg,
+                        backgroundColor: isDark ? '#111111' : '#e0e0e0',
                         padding: '20px',
                         overflow: 'hidden',
                       }}
@@ -886,6 +840,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                               fontWeight: 700,
                               color: isDark ? '#ffffff' : '#000000',
                               margin: '0 0 6px 0',
+                              fontFamily: 'inherit',
                             }}
                           >
                             {selectedAlgo.name}
@@ -896,6 +851,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                               color: '#888888',
                               margin: '0 0 20px 0',
                               lineHeight: 1.5,
+                              fontFamily: 'inherit',
                             }}
                           >
                             {selectedAlgo.description}
@@ -908,23 +864,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                           style={{
                             fontSize: '13px',
                             color: '#ff1744',
-                            textTransform: 'uppercase',
                             margin: '0 0 16px 0',
+                            fontFamily: 'inherit',
                           }}
                         >
                           {noPathFound ? 'NO PATH FOUND' : 'INVALID START/END POINT'}
                         </p>
                       )}
 
-                      {solveResult ? (
+                      {solveResult && (
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           {[
                             { label: 'Nodes Visited', value: String(solveResult.nodesVisited) },
-                            { label: 'Path Length', value: String(solveResult.pathLength) },
-                            {
-                              label: 'Time Taken',
-                              value: `${solveResult.timeTaken.toFixed(2)}ms`,
-                            },
+                            { label: 'Path Length',   value: String(solveResult.pathLength) },
+                            { label: 'Time Taken',    value: `${solveResult.timeTaken.toFixed(2)}ms` },
                             {
                               label: 'Complexity',
                               value: selectedAlgo ? ALGO_COMPLEXITY[selectedAlgo.id] ?? '—' : '—',
@@ -936,8 +889,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                height: '48px',
-                                minHeight: '48px',
+                                height: '52px',
+                                minHeight: '52px',
                                 borderBottom:
                                   idx < 3
                                     ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
@@ -948,6 +901,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                                 style={{
                                   fontSize: '13px',
                                   color: '#888888',
+                                  fontFamily: 'inherit',
                                 }}
                               >
                                 {row.label}
@@ -957,9 +911,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                                   fontSize: '14px',
                                   color: isDark ? '#ffffff' : '#000000',
                                   fontFamily: 'inherit',
-                                  padding: '4px 12px',
+                                  padding: '4px 16px',
                                   borderRadius: '6px',
-                                  border: `1px solid ${borderColor}`,
+                                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
                                   backgroundColor: valueBoxBg,
                                   minWidth: '48px',
                                   textAlign: 'center',
@@ -970,7 +924,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                             </div>
                           ))}
                         </div>
-                      ) : null}
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
