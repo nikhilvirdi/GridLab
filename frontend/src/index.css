@@ -36,7 +36,9 @@ body {
 input[type='range'] {
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 6px;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
   outline: none;
   cursor: pointer;
@@ -47,22 +49,19 @@ input[type='range']::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #f5c518;
-  border: 2px solid #0d0d0d;
-  box-shadow: 0 0 6px rgba(245, 197, 24, 0.5);
+  background: #ffffff;
+  border: 0;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease;
 }
 input[type='range']::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  box-shadow: 0 0 10px rgba(245, 197, 24, 0.7);
 }
 input[type='range']::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #f5c518;
-  border: 2px solid #0d0d0d;
-  box-shadow: 0 0 6px rgba(245, 197, 24, 0.5);
+  background: #ffffff;
+  border: 0;
   cursor: pointer;
 }

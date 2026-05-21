@@ -76,7 +76,6 @@ const ALGORITHMS: AlgorithmOption[] = [
 ];
 
 const SPEED_DELAY = [50, 20, 5]; // Slow=50ms, Medium=20ms, Fast=5ms
-const SPEED_LABELS = ['SLOW', 'MEDIUM', 'FAST'];
 const PATH_DELAY = 30; // Fixed 30ms
 
 export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
@@ -443,11 +442,113 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
         </div>
       </div>
 
-      {/* Right: Controls + Stats — 45% width, content vertically centered */}
       <div className="w-[45%] flex flex-col justify-center pr-12 gap-6">
+        {/* Controls container (Controls Row + Speed Slider + Description) */}
+        <div className="flex flex-col items-center w-full relative z-40">
+          
+          {/* Controls row: Reset button, dropdown, RUN button */}
+          <div className="flex items-center justify-center gap-3 w-full relative z-40">
+            
+            {/* Reset button with SVG rotation */}
+            <button
+              onClick={handleReset}
+              className="flex items-center justify-center w-[44px] h-[44px] rounded-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white active:scale-95 transition-all duration-200 focus:outline-none"
+              title="Reset Grid"
+            >
+              <motion.svg
+                animate={{ rotate: rotation }}
+                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                xmlns="http://www.w3.org/2000/svg"
+                width="18" height="18"
+                viewBox="0 0 24 24"
+                fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </motion.svg>
+            </button>
 
-        {/* Speed Slider (only visible while animating) */}
-        <div className="min-h-[40px] flex items-center justify-center w-full">
+            {/* Dropdown selector */}
+            <div className="relative w-[220px]" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(prev => !prev)}
+                disabled={isAnimating}
+                className="flex items-center justify-between w-full px-4 h-[44px] rounded-[10px] text-[11px] font-mono tracking-wider uppercase text-left transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white"
+              >
+                <span>
+                  {selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}
+                </span>
+                <svg
+                  className={`w-3.5 h-3.5 text-white transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute bottom-full mb-2 left-0 w-full rounded-[10px] overflow-hidden shadow-2xl flex flex-col z-50 bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)]"
+                  >
+                    {ALGORITHMS.map(algo => (
+                      <button
+                        key={algo.id}
+                        onClick={() => { setSelectedAlgo(algo); setIsDropdownOpen(false); }}
+                        className={`flex items-center justify-between w-full px-4 py-2.5 text-left transition-all duration-150 last:border-b-0 border-b border-[rgba(255,255,255,0.1)]/40 hover:bg-[#222222] ${selectedAlgo?.id === algo.id ? 'bg-[#222222] text-[#ffd700]' : 'text-gray-300'}`}
+                      >
+                        <span className="text-[10px] font-bold uppercase">{algo.name}</span>
+                        <span
+                          style={{ color: algo.badgeColor, backgroundColor: algo.badgeBg, borderColor: `${algo.badgeColor}26` }}
+                          className="text-[7px] font-mono font-bold tracking-widest px-1 py-0.5 rounded border uppercase"
+                        >
+                          {algo.tag}
+                        </span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* RUN / STOP buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                disabled={isRunDisabled}
+                onClick={handleRun}
+                className="px-8 h-[44px] rounded-[10px] border border-[rgba(255,255,255,0.15)] font-bold text-[11px] font-mono tracking-widest transition-all duration-200 bg-[#1a1a1a] text-[#00e676] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1a1a1a]/85"
+              >
+                {isFetching ? (
+                  <svg className="animate-spin w-4.5 h-4.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                ) : 'RUN'}
+              </button>
+
+              <AnimatePresence>
+                {isAnimating && (
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    onClick={handleStop}
+                    className="px-4 h-[44px] rounded-[10px] border border-[rgba(255,255,255,0.15)] text-[#ff1744] text-[11px] font-mono font-bold tracking-widest uppercase hover:bg-[#ff1744]/10 active:scale-95 transition-all duration-150 bg-[#1a1a1a]"
+                  >
+                    STOP
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </div>
+
+          </div>
+
+          {/* Speed Slider (only visible while animating) */}
           <AnimatePresence>
             {isAnimating && (
               <motion.div
@@ -455,11 +556,9 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center justify-center gap-4 w-full"
+                className="flex items-center justify-between gap-3 w-full mt-4"
               >
-                <span className="text-[10px] tracking-widest uppercase text-gray-500 w-16 text-right">
-                  {SPEED_LABELS[speed]}
-                </span>
+                <span className="text-gray-500 font-mono text-[11px] select-none uppercase">S</span>
                 <input
                   type="range"
                   min={0}
@@ -467,184 +566,54 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   step={1}
                   value={speed}
                   onChange={e => setSpeed(Number(e.target.value))}
-                  className="flex-1 h-1 appearance-none rounded-full outline-none cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, #f5c518 ${speed * 50}%, ${theme === 'dark' ? '#2a2a2a' : '#d0d0d0'} ${speed * 50}%)`
-                  }}
+                  className="flex-1"
                 />
-                <span className="text-[8px] text-gray-600 tracking-widest uppercase">
-                  S/M/F
-                </span>
+                <span className="text-gray-500 font-mono text-[11px] select-none uppercase">F</span>
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
 
-        {/* Control row: Reset button, dropdown, RUN button */}
-        <div className="flex items-center justify-center gap-4 w-full relative z-40">
-        
-        {/* Reset button with SVG rotation */}
-        <button
-          onClick={handleReset}
-          className={`flex items-center justify-center w-10 h-10 rounded-full text-[#f5c518] active:scale-95 transition-all duration-200 focus:outline-none ${
-            theme === 'dark'
-              ? 'bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#222222] hover:text-[#ffd700]'
-              : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)] hover:bg-[#c8c8c8] hover:text-[#ffd700]'
-          }`}
-          title="Reset Grid"
-        >
-          <motion.svg
-            animate={{ rotate: rotation }}
-            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-            xmlns="http://www.w3.org/2000/svg"
-            width="18" height="18"
-            viewBox="0 0 24 24"
-            fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          >
-            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-            <path d="M3 3v5h5" />
-          </motion.svg>
-        </button>
-
-        {/* Dropdown selector */}
-        <div className="relative w-48" ref={dropdownRef}>
-          <button
-            onClick={() => setIsDropdownOpen(prev => !prev)}
-            disabled={isAnimating}
-            className={`flex items-center justify-between w-full px-4 h-10 rounded text-[11px] font-mono tracking-wider uppercase text-left transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed ${
-              theme === 'dark'
-                ? 'bg-[#1a1a1a] border border-[#2a2a2a] hover:bg-[#222222]'
-                : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)] hover:bg-[#c8c8c8]'
-            }`}
-          >
-            <span className={selectedAlgo ? (theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]') : 'text-gray-500'}>
-              {selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}
-            </span>
-            <svg
-              className={`w-3.5 h-3.5 text-[#f5c518] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
-              fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-
-          <AnimatePresence>
-            {isDropdownOpen && (
+          {/* Selected Algorithm Description */}
+          <AnimatePresence mode="wait">
+            {selectedAlgo && !isAnimating && (
               <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-                className={`absolute bottom-full mb-2 left-0 w-full rounded overflow-hidden shadow-2xl flex flex-col z-50 ${
-                  theme === 'dark'
-                    ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
-                    : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-                }`}
+                key={selectedAlgo.id}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="text-[10px] text-gray-600 font-mono text-center tracking-wider max-w-md uppercase mt-4 select-none"
               >
-                {ALGORITHMS.map(algo => (
-                  <button
-                    key={algo.id}
-                    onClick={() => { setSelectedAlgo(algo); setIsDropdownOpen(false); }}
-                    className={`flex items-center justify-between w-full px-4 py-2.5 text-left transition-all duration-150 last:border-b-0 ${
-                      theme === 'dark'
-                        ? `border-b border-[#2a2a2a]/40 hover:bg-[#222222] ${selectedAlgo?.id === algo.id ? 'bg-[#222222] text-[#ffd700]' : 'text-gray-300'}`
-                        : `border-b border-[rgba(0,0,0,0.15)]/40 hover:bg-[#c8c8c8] ${selectedAlgo?.id === algo.id ? 'bg-[#c8c8c8] text-[#1a1a1a] font-bold' : 'text-[#1a1a1a]'}`
-                    }`}
-                  >
-                    <span className="text-[10px] font-bold uppercase">{algo.name}</span>
-                    <span
-                      style={{ color: algo.badgeColor, backgroundColor: algo.badgeBg, borderColor: `${algo.badgeColor}26` }}
-                      className="text-[7px] font-mono font-bold tracking-widest px-1 py-0.5 rounded border uppercase"
-                    >
-                      {algo.tag}
-                    </span>
-                  </button>
-                ))}
+                {selectedAlgo.description}
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
 
-        {/* RUN / STOP buttons */}
-        <div className="flex items-center gap-2">
-          <button
-            disabled={isRunDisabled}
-            onClick={handleRun}
-            className={`px-6 h-10 rounded border font-bold text-[11px] tracking-widest transition-all duration-200 ${
-              isRunDisabled
-                ? (theme === 'dark'
-                    ? 'opacity-30 bg-[#1a1a1a] border-[#2a2a2a] text-gray-500 cursor-not-allowed'
-                    : 'opacity-30 bg-[#d0d0d0] border-[rgba(0,0,0,0.15)] text-gray-500 cursor-not-allowed')
-                : 'opacity-100 border-[#f5c518] text-[#f5c518] hover:bg-[#f5c518] hover:text-[#1a1a1a] active:scale-95 cursor-pointer'
-            }`}
-          >
-            {isFetching ? (
-              <svg className="animate-spin w-4.5 h-4.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-            ) : 'RUN'}
-          </button>
-
-          <AnimatePresence>
-            {isAnimating && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                onClick={handleStop}
-                className={`px-4 h-10 rounded border border-[#ff1744]/60 text-[#ff1744] text-[11px] font-bold tracking-widest uppercase hover:bg-[#ff1744]/10 active:scale-95 transition-all duration-150 ${
-                  theme === 'dark' ? 'bg-[#1a1a1a]' : 'bg-[#d0d0d0]'
-                }`}
-              >
-                STOP
-              </motion.button>
-            )}
-          </AnimatePresence>
         </div>
-        </div>
-
-        {/* Description & Errors */}
-        <div className="w-full min-h-[40px] flex flex-col gap-2 items-center">
-        {/* Selected Algorithm Description */}
-        <AnimatePresence mode="wait">
-          {selectedAlgo && !isAnimating && (
-            <motion.div
-              key={selectedAlgo.id}
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="text-[10px] text-gray-500 text-center tracking-wider max-w-md uppercase"
-            >
-              {selectedAlgo.description}
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Error banner area */}
-        <AnimatePresence>
-          {noPathFound && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
-            >
-              NO PATH FOUND
-            </motion.div>
-          )}
-          {invalidPlacement && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
-            >
-              INVALID START OR END POINT
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <div className="w-full min-h-[20px] flex flex-col gap-2 items-center">
+          <AnimatePresence>
+            {noPathFound && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
+              >
+                NO PATH FOUND
+              </motion.div>
+            )}
+            {invalidPlacement && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
+              >
+                INVALID START OR END POINT
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Stats Panel (appears below controls Row, fades in post-animation) */}
