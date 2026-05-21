@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import LoaderOne from '../components/LoaderOne';
 
 interface Point {
   r: number;
@@ -78,6 +79,15 @@ const ALGORITHMS: AlgorithmOption[] = [
 const SPEED_DELAY = [50, 20, 5]; // Slow=50ms, Medium=20ms, Fast=5ms
 const PATH_DELAY = 30; // Fixed 30ms
 
+const ALGO_COMPLEXITY: Record<string, string> = {
+  bfs: 'O(V + E)',
+  dfs: 'O(V + E)',
+  astar: 'O(E log V)',
+  jps: 'O(E log V)',
+  'bidirectional-bfs': 'O(b^(d/2))',
+  greedy: 'O(E log V)',
+};
+
 export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
@@ -91,6 +101,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [gridSizePx, setGridSizePx] = useState(0);
 
   // Points
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -108,9 +119,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   const [invalidPlacement, setInvalidPlacement] = useState(false);
   const [speed, setSpeed]             = useState(1); // 0=Slow 1=Med 2=Fast
   const [solveResult, setSolveResult] = useState<SolveResult | null>(null);
-  const [showStats, setShowStats]     = useState(false);
+  const [showStats, setShowStats]         = useState(false);
+  const [statsPanelOpen, setStatsPanelOpen] = useState(false);
 
   const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating;
+  const isDark = theme === 'dark';
 
   // Refs for mirroring states to prevent stale closure & render race conditions
   const isAnimatingRef = useRef(false);
@@ -160,15 +173,23 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Responsive canvas size
+  // Compute explicit square grid size (~520px with breathing room per reference)
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const update = () => { const w = container.clientWidth; setDimensions({ width: w, height: w }); };
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(container);
-    return () => ro.disconnect();
+    const compute = () => {
+      const contentH = window.innerHeight - 80;
+      const colW = window.innerWidth * 0.55;
+      const px = Math.min(
+        520,
+        Math.floor(colW - 200),
+        Math.floor(contentH - 160)
+      );
+      const size = Math.max(px, 280);
+      setGridSizePx(size);
+      setDimensions({ width: size, height: size });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    return () => window.removeEventListener('resize', compute);
   }, []);
 
   // Canvas click handler
@@ -202,6 +223,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     setEndPoint(null);
     setSolveResult(null);
     setShowStats(false);
+    setStatsPanelOpen(false);
     setNoPathFound(false);
     setInvalidPlacement(false);
     setRotation(prev => prev + 360);
@@ -312,6 +334,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     setNoPathFound(false);
     setInvalidPlacement(false);
     setShowStats(false);
+    setStatsPanelOpen(false);
 
     try {
       const res = await fetch(`http://localhost:3001/api/solve/${slug}`, {
@@ -425,87 +448,249 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
     drawBaseGrid();
   }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats, theme]);
 
+  const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  const panelBg = isDark ? '#111111' : '#e0e0e0';
+  const statsPanelBg = isDark ? '#0d0d0d' : '#e8e8e8';
+  const valueBoxBg = isDark ? '#1a1a1a' : '#d8d8d8';
+
+  const CONTENT_W = 420;
+  const CTRL_H = 48;
+  const SECTION_GAP = 28;
+  const DROPDOWN_W = 260;
+
   return (
-    <div className={`w-full h-full flex flex-row font-mono select-none ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>
-      
-      {/* Left: Canvas visualizer — 55% width, padded from left edge */}
-      <div className="w-[55%] h-full flex items-center pl-[150px] pr-6 py-6">
+    <div
+      className="flex flex-row font-mono select-none min-h-0"
+      style={{ width: '100%', height: '100%', flex: 1 }}
+    >
+      {/* Fullscreen loader */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center"
+            style={{ backgroundColor: '#000000' }}
+          >
+            <LoaderOne />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Left column — 55%, grid centered with breathing room */}
+      <div
+        style={{
+          width: '55%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          backgroundColor: isDark ? '#000000' : '#f0f0f0',
+        }}
+      >
         <div
           ref={containerRef}
-          className={`h-[80vh] max-h-full max-w-full aspect-square overflow-hidden relative flex items-center justify-center transition-all duration-300 ${theme === 'dark' ? 'bg-[#0d0d0d] border border-[#1a1a1a]' : 'bg-[#e2e2e2] border border-[rgba(0,0,0,0.15)]'}`}
+          style={{
+            width: gridSizePx > 0 ? `${gridSizePx}px` : undefined,
+            height: gridSizePx > 0 ? `${gridSizePx}px` : undefined,
+            backgroundColor: isDark ? '#000000' : '#f0f0f0',
+            overflow: 'hidden',
+            flexShrink: 0,
+            position: 'relative',
+          }}
         >
           <canvas
             ref={canvasRef}
             onClick={handleCanvasClick}
-            className={`block ${isAnimating ? 'cursor-default' : 'cursor-crosshair'}`}
+            style={{
+              display: 'block',
+              width: gridSizePx > 0 ? `${gridSizePx}px` : '100%',
+              height: gridSizePx > 0 ? `${gridSizePx}px` : '100%',
+              cursor: isAnimating ? 'default' : 'crosshair',
+            }}
           />
         </div>
       </div>
 
-      <div className="w-[45%] flex flex-col justify-center pr-12 gap-6">
-        {/* Controls container (Controls Row + Speed Slider + Description) */}
-        <div className="flex flex-col items-center w-full relative z-40">
-          
-          {/* Controls row: Reset button, dropdown, RUN button */}
-          <div className="flex items-center justify-center gap-3 w-full relative z-40">
-            
-            {/* Reset button with SVG rotation */}
+      {/* Right column — 45%, content vertically centered */}
+      <div
+        style={{
+          width: '45%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <div
+          style={{
+            width: `${CONTENT_W}px`,
+            maxWidth: `${CONTENT_W}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: `${SECTION_GAP}px`,
+            alignItems: 'stretch',
+          }}
+        >
+          {/* Controls row */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: '16px',
+            }}
+          >
+            {/* Reset */}
             <button
               onClick={handleReset}
-              className="flex items-center justify-center w-[44px] h-[44px] rounded-full bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white active:scale-95 transition-all duration-200 focus:outline-none"
               title="Reset Grid"
+              style={{
+                width: `${CTRL_H}px`,
+                height: `${CTRL_H}px`,
+                minWidth: `${CTRL_H}px`,
+                minHeight: `${CTRL_H}px`,
+                borderRadius: '50%',
+                backgroundColor: panelBg,
+                border: `1px solid ${borderColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+                padding: 0,
+              }}
             >
               <motion.svg
                 animate={{ rotate: rotation }}
                 transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                 xmlns="http://www.w3.org/2000/svg"
-                width="18" height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
-                fill="none" stroke="currentColor"
-                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                fill="none"
+                stroke={isDark ? '#ffffff' : '#000000'}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </motion.svg>
             </button>
 
-            {/* Dropdown selector */}
-            <div className="relative w-[220px]" ref={dropdownRef}>
+            {/* Dropdown */}
+            <div ref={dropdownRef} style={{ position: 'relative', width: `${DROPDOWN_W}px`, flexShrink: 0 }}>
               <button
-                onClick={() => setIsDropdownOpen(prev => !prev)}
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
                 disabled={isAnimating}
-                className="flex items-center justify-between w-full px-4 h-[44px] rounded-[10px] text-[11px] font-mono tracking-wider uppercase text-left transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)] text-white"
+                style={{
+                  width: `${DROPDOWN_W}px`,
+                  height: `${CTRL_H}px`,
+                  borderRadius: '10px',
+                  backgroundColor: panelBg,
+                  border: `1px solid ${borderColor}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 16px',
+                  cursor: isAnimating ? 'not-allowed' : 'pointer',
+                  opacity: isAnimating ? 0.3 : 1,
+                  fontFamily: 'inherit',
+                  fontSize: '15px',
+                  textTransform: 'uppercase',
+                  color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : '#888888',
+                }}
               >
-                <span>
-                  {selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}
-                </span>
+                <span>{selectedAlgo ? selectedAlgo.name : 'SELECT ALGORITHM'}</span>
                 <svg
-                  className={`w-3.5 h-3.5 text-white transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
-                  fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDark ? '#ffffff' : '#000000'}
+                  strokeWidth="2"
+                  style={{
+                    flexShrink: 0,
+                    transform: isDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}
                 >
-                  <polyline points="6 9 12 15 18 9" />
+                  <polyline points="6 15 12 9 18 15" />
                 </svg>
               </button>
 
               <AnimatePresence>
                 {isDropdownOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className="absolute bottom-full mb-2 left-0 w-full rounded-[10px] overflow-hidden shadow-2xl flex flex-col z-50 bg-[#1a1a1a] border border-[rgba(255,255,255,0.15)]"
+                    style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      marginBottom: '8px',
+                      left: 0,
+                      width: `${DROPDOWN_W}px`,
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      backgroundColor: panelBg,
+                      border: `1px solid ${borderColor}`,
+                      zIndex: 50,
+                    }}
                   >
-                    {ALGORITHMS.map(algo => (
+                    {ALGORITHMS.map((algo, idx) => (
                       <button
                         key={algo.id}
-                        onClick={() => { setSelectedAlgo(algo); setIsDropdownOpen(false); }}
-                        className={`flex items-center justify-between w-full px-4 py-2.5 text-left transition-all duration-150 last:border-b-0 border-b border-[rgba(255,255,255,0.1)]/40 hover:bg-[#222222] ${selectedAlgo?.id === algo.id ? 'bg-[#222222] text-[#ffd700]' : 'text-gray-300'}`}
+                        onClick={() => {
+                          setSelectedAlgo(algo);
+                          setIsDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 16px',
+                          backgroundColor: panelBg,
+                          border: 'none',
+                          borderBottom:
+                            idx < ALGORITHMS.length - 1
+                              ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                              : 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '15px',
+                          textTransform: 'uppercase',
+                          color:
+                            selectedAlgo?.id === algo.id
+                              ? isDark
+                                ? '#ffffff'
+                                : '#000000'
+                              : isDark
+                                ? '#cccccc'
+                                : '#444444',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = panelBg;
+                        }}
                       >
-                        <span className="text-[10px] font-bold uppercase">{algo.name}</span>
+                        <span>{algo.name}</span>
                         <span
-                          style={{ color: algo.badgeColor, backgroundColor: algo.badgeBg, borderColor: `${algo.badgeColor}26` }}
-                          className="text-[7px] font-mono font-bold tracking-widest px-1 py-0.5 rounded border uppercase"
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            letterSpacing: '0.1em',
+                            color: algo.badgeColor,
+                          }}
                         >
                           {algo.tag}
                         </span>
@@ -516,183 +701,284 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
               </AnimatePresence>
             </div>
 
-            {/* RUN / STOP buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                disabled={isRunDisabled}
-                onClick={handleRun}
-                className="px-8 h-[44px] rounded-[10px] border border-[rgba(255,255,255,0.15)] font-bold text-[11px] font-mono tracking-widest transition-all duration-200 bg-[#1a1a1a] text-[#00e676] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#1a1a1a]/85"
-              >
-                {isFetching ? (
-                  <svg className="animate-spin w-4.5 h-4.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                ) : 'RUN'}
-              </button>
-
-              <AnimatePresence>
-                {isAnimating && (
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    onClick={handleStop}
-                    className="px-4 h-[44px] rounded-[10px] border border-[rgba(255,255,255,0.15)] text-[#ff1744] text-[11px] font-mono font-bold tracking-widest uppercase hover:bg-[#ff1744]/10 active:scale-95 transition-all duration-150 bg-[#1a1a1a]"
-                  >
-                    STOP
-                  </motion.button>
-                )}
-              </AnimatePresence>
-            </div>
-
+            {/* RUN */}
+            <button
+              disabled={isRunDisabled}
+              onClick={handleRun}
+              style={{
+                height: `${CTRL_H}px`,
+                padding: '0 40px',
+                borderRadius: '10px',
+                backgroundColor: panelBg,
+                border: isRunDisabled
+                  ? `1px solid ${borderColor}`
+                  : '1px solid rgba(0,230,118,0.4)',
+                fontFamily: 'inherit',
+                fontSize: '15px',
+                fontWeight: 400,
+                textTransform: 'uppercase',
+                color: '#00e676',
+                cursor: isRunDisabled ? 'not-allowed' : 'pointer',
+                opacity: isRunDisabled ? 0.3 : 1,
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {isFetching ? (
+                <svg
+                  width="16"
+                  height="16"
+                  className="animate-spin"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke={isDark ? '#ffffff' : '#000000'}
+                    strokeWidth="3"
+                    opacity="0.25"
+                  />
+                  <path
+                    fill={isDark ? '#ffffff' : '#000000'}
+                    opacity="0.75"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+              ) : (
+                'RUN'
+              )}
+            </button>
           </div>
 
-          {/* Speed Slider (only visible while animating) */}
+          {/* Algorithm description */}
+          <AnimatePresence mode="wait">
+            {selectedAlgo && (
+              <motion.p
+                key={selectedAlgo.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{
+                  fontSize: '13px',
+                  color: '#aaaaaa',
+                  fontFamily: 'inherit',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.45,
+                  margin: 0,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {selectedAlgo.description}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          {/* Speed slider + STOP */}
           <AnimatePresence>
             {isAnimating && (
               <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center justify-between gap-3 w-full mt-4"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  marginTop: '20px',
+                }}
               >
-                <span className="text-gray-500 font-mono text-[11px] select-none uppercase">S</span>
+                <span style={{ fontSize: '13px', color: '#888888', flexShrink: 0 }}>S</span>
                 <input
                   type="range"
                   min={0}
                   max={2}
                   step={1}
                   value={speed}
-                  onChange={e => setSpeed(Number(e.target.value))}
-                  className="flex-1"
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                  className={isDark ? 'speed-slider' : 'speed-slider-light'}
+                  style={{ flex: 1 }}
                 />
-                <span className="text-gray-500 font-mono text-[11px] select-none uppercase">F</span>
+                <span style={{ fontSize: '13px', color: '#888888', flexShrink: 0 }}>F</span>
+                <button
+                  onClick={handleStop}
+                  style={{
+                    height: '36px',
+                    padding: '0 16px',
+                    borderRadius: '8px',
+                    backgroundColor: panelBg,
+                    border: '1px solid rgba(255,0,0,0.3)',
+                    color: '#ff1744',
+                    fontFamily: 'inherit',
+                    fontSize: '15px',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  STOP
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Selected Algorithm Description */}
-          <AnimatePresence mode="wait">
-            {selectedAlgo && !isAnimating && (
-              <motion.div
-                key={selectedAlgo.id}
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="text-[10px] text-gray-600 font-mono text-center tracking-wider max-w-md uppercase mt-4 select-none"
-              >
-                {selectedAlgo.description}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-        </div>
-
-        {/* Error banner area */}
-        <div className="w-full min-h-[20px] flex flex-col gap-2 items-center">
+          {/* See Stats + panel */}
           <AnimatePresence>
-            {noPathFound && (
+            {(showStats || noPathFound || invalidPlacement) && (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: `${SECTION_GAP}px`, width: '100%' }}
               >
-                NO PATH FOUND
-              </motion.div>
-            )}
-            {invalidPlacement && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="text-[11px] font-bold tracking-widest uppercase text-[#ff1744]"
-              >
-                INVALID START OR END POINT
+                <button
+                  onClick={() => setStatsPanelOpen((prev) => !prev)}
+                  style={{
+                    width: '100%',
+                    height: `${CTRL_H}px`,
+                    borderRadius: '10px',
+                    backgroundColor: panelBg,
+                    border: isDark
+                      ? '1px solid rgba(255,255,255,0.2)'
+                      : `1px solid ${borderColor}`,
+                    color: isDark ? '#ffffff' : '#000000',
+                    fontFamily: 'inherit',
+                    fontSize: '15px',
+                    textTransform: 'uppercase',
+                    cursor: 'pointer',
+                  }}
+                >
+                  SEE STATS
+                </button>
+
+                <AnimatePresence>
+                  {statsPanelOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeOut' }}
+                      style={{
+                        width: `${CONTENT_W}px`,
+                        borderRadius: '12px',
+                        border: `1px solid ${borderColor}`,
+                        backgroundColor: statsPanelBg,
+                        padding: '20px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {selectedAlgo && (
+                        <>
+                          <p
+                            style={{
+                              fontSize: '18px',
+                              fontWeight: 700,
+                              color: isDark ? '#ffffff' : '#000000',
+                              margin: '0 0 6px 0',
+                            }}
+                          >
+                            {selectedAlgo.name}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: '13px',
+                              color: '#888888',
+                              margin: '0 0 20px 0',
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {selectedAlgo.description}
+                          </p>
+                        </>
+                      )}
+
+                      {(noPathFound || invalidPlacement) && (
+                        <p
+                          style={{
+                            fontSize: '13px',
+                            color: '#ff1744',
+                            textTransform: 'uppercase',
+                            margin: '0 0 16px 0',
+                          }}
+                        >
+                          {noPathFound ? 'NO PATH FOUND' : 'INVALID START/END POINT'}
+                        </p>
+                      )}
+
+                      {solveResult ? (
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          {[
+                            { label: 'Nodes Visited', value: String(solveResult.nodesVisited) },
+                            { label: 'Path Length', value: String(solveResult.pathLength) },
+                            {
+                              label: 'Time Taken',
+                              value: `${solveResult.timeTaken.toFixed(2)}ms`,
+                            },
+                            {
+                              label: 'Complexity',
+                              value: selectedAlgo ? ALGO_COMPLEXITY[selectedAlgo.id] ?? '—' : '—',
+                            },
+                          ].map((row, idx) => (
+                            <div
+                              key={row.label}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                height: '48px',
+                                minHeight: '48px',
+                                borderBottom:
+                                  idx < 3
+                                    ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                                    : 'none',
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: '13px',
+                                  color: '#888888',
+                                }}
+                              >
+                                {row.label}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '14px',
+                                  color: isDark ? '#ffffff' : '#000000',
+                                  fontFamily: 'inherit',
+                                  padding: '4px 12px',
+                                  borderRadius: '6px',
+                                  border: `1px solid ${borderColor}`,
+                                  backgroundColor: valueBoxBg,
+                                  minWidth: '48px',
+                                  textAlign: 'center',
+                                }}
+                              >
+                                {row.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>
+
         </div>
-
-        {/* Stats Panel (appears below controls Row, fades in post-animation) */}
-        <div className="w-full min-h-[80px]">
-        <AnimatePresence>
-          {showStats && solveResult && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              transition={{ duration: 0.3 }}
-              className="grid grid-cols-4 gap-4 w-full"
-            >
-              {/* ALGORITHM card */}
-              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
-                theme === 'dark'
-                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
-                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-              }`}>
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className={`text-[10px] font-bold uppercase ${theme === 'dark' ? 'text-white' : 'text-[#1a1a1a]'}`}>{selectedAlgo?.name}</span>
-                  <span
-                    style={{ color: selectedAlgo?.badgeColor, backgroundColor: selectedAlgo?.badgeBg, borderColor: `${selectedAlgo?.badgeColor}26` }}
-                    className="text-[6px] font-mono tracking-widest px-0.5 py-0.2 rounded border uppercase font-bold"
-                  >
-                    {selectedAlgo?.tag}
-                  </span>
-                </div>
-                <span className="text-[8px] text-gray-500 uppercase tracking-wider">
-                  ALGORITHM
-                </span>
-              </div>
-
-              {/* NODES VISITED card */}
-              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
-                theme === 'dark'
-                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
-                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-              }`}>
-                <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
-                  {solveResult.nodesVisited}
-                </span>
-                <span className="text-[8px] text-gray-500 uppercase tracking-wider">
-                  NODES VISITED
-                </span>
-              </div>
- 
-              {/* PATH LENGTH card */}
-              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
-                theme === 'dark'
-                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
-                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-              }`}>
-                <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
-                  {solveResult.pathLength}
-                </span>
-                <span className="text-[8px] text-gray-500 uppercase tracking-wider">
-                  PATH LENGTH
-                </span>
-              </div>
- 
-              {/* TIME TAKEN card */}
-              <div className={`flex flex-col items-center justify-center p-3 rounded transition-all duration-300 ${
-                theme === 'dark'
-                  ? 'bg-[#1a1a1a] border border-[#2a2a2a]'
-                  : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-              }`}>
-                <span className="text-lg font-bold text-[#f5c518] leading-none mb-1">
-                  {solveResult.timeTaken.toFixed(2)}ms
-                </span>
-                <span className="text-[8px] text-gray-500 uppercase tracking-wider">
-                  TIME TAKEN
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        </div>
-
       </div>
     </div>
   );

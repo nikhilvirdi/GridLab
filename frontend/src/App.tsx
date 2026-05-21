@@ -6,55 +6,106 @@ function App() {
   const [activeTab, setActiveTab] = useState<'visualizer' | 'documentation'>('visualizer');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
+  const isDark = theme === 'dark';
+
   return (
-    <div className={`h-screen overflow-hidden flex flex-col select-none transition-colors duration-300 ${
-      theme === 'dark' ? 'bg-[#0d0d0d] text-white' : 'bg-[#e2e2e2] text-[#1a1a1a]'
-    }`}>
-      {/* Floating pill-shaped Navbar */}
-      <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 p-1 rounded-xl font-sans text-[14px] select-none transition-all duration-300 ${
-        theme === 'dark'
-          ? 'bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)]'
-          : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)]'
-      }`}>
+    <div
+      className="overflow-hidden select-none font-mono"
+      style={{
+        height: '100vh',
+        backgroundColor: isDark ? '#000000' : '#f0f0f0',
+        color: isDark ? '#ffffff' : '#000000',
+      }}
+    >
+      {/* Logo */}
+      <img
+        src={isDark ? '/gridlab_logo.png' : '/gridlab_logo_lighttheme.png'}
+        alt="GridLab"
+        className="fixed z-50"
+        style={{ top: '24px', left: '32px', height: '56px', width: 'auto' }}
+      />
+
+      {/* Navbar */}
+      <div
+        className="fixed left-1/2 z-50 flex items-center"
+        style={{
+          top: '20px',
+          transform: 'translateX(-50%)',
+          backgroundColor: isDark ? '#111111' : '#e0e0e0',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
+          borderRadius: '12px',
+          padding: '4px',
+          fontSize: '15px',
+        }}
+      >
         <button
           onClick={() => setActiveTab('visualizer')}
-          className={`w-[130px] py-2 rounded-lg transition-all duration-200 font-medium text-center ${
-            activeTab === 'visualizer'
-              ? (theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#e2e2e2] text-[#1a1a1a]')
-              : (theme === 'dark' ? 'text-[#888888] hover:text-white' : 'text-[#666666] hover:text-[#1a1a1a]')
-          }`}
+          style={{
+            padding: '10px 32px',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '15px',
+            backgroundColor:
+              activeTab === 'visualizer'
+                ? isDark
+                  ? '#000000'
+                  : '#f0f0f0'
+                : 'transparent',
+            color:
+              activeTab === 'visualizer'
+                ? isDark
+                  ? '#ffffff'
+                  : '#000000'
+                : '#888888',
+          }}
         >
           Visualizer
         </button>
         <button
           onClick={() => setActiveTab('documentation')}
-          className={`w-[130px] py-2 rounded-lg transition-all duration-200 font-medium text-center ${
-            activeTab === 'documentation'
-              ? (theme === 'dark' ? 'bg-[#0a0a0a] text-white' : 'bg-[#e2e2e2] text-[#1a1a1a]')
-              : (theme === 'dark' ? 'text-[#888888] hover:text-white' : 'text-[#666666] hover:text-[#1a1a1a]')
-          }`}
+          style={{
+            padding: '10px 32px',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '15px',
+            backgroundColor:
+              activeTab === 'documentation'
+                ? isDark
+                  ? '#000000'
+                  : '#f0f0f0'
+                : 'transparent',
+            color:
+              activeTab === 'documentation'
+                ? isDark
+                  ? '#ffffff'
+                  : '#000000'
+                : '#888888',
+          }}
         >
           Documentation
         </button>
       </div>
 
-      {/* Logo */}
-      <img
-        src={theme === 'dark' ? '/gridlab_logo.png' : '/gridlab_logo_lighttheme.png'}
-        alt="GridLab"
-        style={{ height: '40px', width: 'auto' }}
-        className="fixed top-6 left-6"
-      />
-
-      {/* Theme Toggle Button */}
+      {/* Theme toggle */}
       <button
-        onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-        className={`fixed top-6 right-6 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 active:scale-95 z-50 focus:outline-none ${
-          theme === 'dark'
-            ? 'bg-[#1a1a1a] border border-[rgba(255,255,255,0.2)] hover:bg-[#262626]'
-            : 'bg-[#d0d0d0] border border-[rgba(0,0,0,0.15)] hover:bg-[#c8c8c8]'
-        }`}
+        onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         aria-label="Toggle Theme"
+        className="fixed z-50 flex items-center justify-center"
+        style={{
+          top: '24px',
+          right: '24px',
+          width: '44px',
+          height: '44px',
+          borderRadius: '50%',
+          backgroundColor: isDark ? '#111111' : '#e0e0e0',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
+          cursor: 'pointer',
+          padding: 0,
+        }}
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -65,29 +116,55 @@ function App() {
             transition={{ duration: 0.15 }}
             className="flex items-center justify-center"
           >
-            {theme === 'dark' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            {isDark ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#1a1a1a]">
-                <circle cx="12" cy="12" r="4"/>
-                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#000000"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
               </svg>
             )}
           </motion.div>
         </AnimatePresence>
       </button>
 
-      {/* Page content — sits below fixed navbar */}
-      <div className="flex-1 pt-[70px] overflow-hidden">
+      {/* Main content */}
+      <div
+        style={{
+          paddingTop: '80px',
+          height: 'calc(100vh - 80px)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'row',
+          width: '100%',
+        }}
+      >
         {activeTab === 'visualizer' ? (
-          <div className="h-full w-full">
-            <GridCanvas size={60} theme={theme} />
-          </div>
+          <GridCanvas size={60} theme={theme} />
         ) : (
-          /* Empty placeholder for Documentation tab as instructed */
-          <div className="h-full" />
+          <div style={{ width: '100%', height: '100%' }} />
         )}
       </div>
     </div>
