@@ -48,23 +48,23 @@ class MinHeap {
         }
     }
 }
-const manhattan = (a, b) => Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
+const h = (a, b) => Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 const key = (r, c) => `${r},${c}`;
 /**
- * JPS — Jump Point Search
+ * JPS — Jump Point Search for 4-directional (cardinal-only) grids.
  *
- * An optimisation of A* for uniform-cost grid maps.
- * Instead of expanding every neighbour, JPS uses pruning rules to skip cells
- * that would be reached more cheaply via another route, and then "jumps"
- * along rows/columns until it finds a jump point (a cell with forced neighbours).
+ * On a 4-directional grid, all movement is either purely horizontal (dc=±1, dr=0)
+ * or purely vertical (dr=±1, dc=0). There are no diagonal moves.
  *
- * This implementation follows the canonical Harabor & Grastien (2011) algorithm
- * for 4-directional movement (no diagonals):
- * - Natural neighbours are pruned based on the parent direction.
- * - Forced neighbours are cells that can only be reached optimally via the current node.
- * - Jump points are identified recursively along horizontal and vertical axes.
- * - The open set is a min-heap ordered by f = g + h.
- * - Intermediate cells between jump points are interpolated for the final path & visited list.
+ * The algorithm:
+ * 1. From the start, scan in all 4 cardinal directions simultaneously.
+ * 2. A jump point is a walkable cell that has at least one "forced neighbour" —
+ *    a neighbour that cannot be reached optimally except via the current cell.
+ * 3. When a jump point is found it is added to the open set (min-heap by f = g + h).
+ * 4. When a jump point is expanded, scanning continues from it in all 4 directions.
+ * 5. The goal cell always counts as a jump point and terminates scanning immediately.
+ *
+ * Path reconstruction interpolates the straight-line segments between jump points.
  */
 function solveJPS(req) {
     const startTime = perf_hooks_1.performance.now();
@@ -73,118 +73,100 @@ function solveJPS(req) {
     const cols = rows > 0 ? grid[0].length : 0;
     const visitedOrder = [];
     const visitedSet = new Set();
+    /** key → parent Point (null for start node) */
     const parent = new Map();
     const gCost = new Map();
     const closed = new Set();
     const srcKey = key(src.row, src.col);
     const dstKey = key(dst.row, dst.col);
-    const isWalkable = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && grid[r][c] === 0;
-    const markVisited = (r, c) => {
+    const walkable = (r, c) => r >= 0 && r < rows && c >= 0 && c < cols && grid[r][c] === 0;
+    const touch = (r, c) => {
         const k = key(r, c);
         if (!visitedSet.has(k)) {
             visitedSet.add(k);
             visitedOrder.push({ row: r, col: c });
         }
     };
-    // Edge cases
+    // ── Edge cases ──────────────────────────────────────────────────────────────
     if (srcKey === dstKey) {
-        const timeTaken = perf_hooks_1.performance.now() - startTime;
-        return { visitedNodes: [src], path: [src], nodesVisited: 1, pathLength: 1, timeTaken };
+        return { visitedNodes: [src], path: [src], nodesVisited: 1, pathLength: 1, timeTaken: 0 };
     }
-    if (!isWalkable(src.row, src.col) || !isWalkable(dst.row, dst.col)) {
-        const timeTaken = perf_hooks_1.performance.now() - startTime;
-        return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
+    if (!walkable(src.row, src.col) || !walkable(dst.row, dst.col)) {
+        return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken: 0 };
     }
+    // ── Iterative horizontal scan ────────────────────────────────────────────────
     /**
-     * Get pruned neighbours of `node` given that it was reached from `parentNode`.
-     * For 4-directional JPS we only prune based on horizontal/vertical directions.
+     * Scan horizontally from (r, c) in direction dc (+1 or -1).
+     * Returns the first jump point found, or null.
      */
-    function getPrunedNeighbours(node, parentNode) {
-        const { row: r, col: c } = node;
-        if (parentNode === null) {
-            // Start node — return all walkable neighbours
-            return [[-1, 0], [1, 0], [0, -1], [0, 1]]
-                .map(([dr, dc]) => ({ row: r + dr, col: c + dc }))
-                .filter(p => isWalkable(p.row, p.col));
-        }
-        const dr = Math.sign(r - parentNode.row);
-        const dc = Math.sign(c - parentNode.col);
-        const neighbours = [];
-        if (dr !== 0 && dc === 0) {
-            // Moving vertically
-            if (isWalkable(r + dr, c))
-                neighbours.push({ row: r + dr, col: c });
-            // Forced neighbours: cells blocked horizontally from parent but accessible from here
-            if (!isWalkable(r, c - 1) && isWalkable(r + dr, c - 1))
-                neighbours.push({ row: r + dr, col: c - 1 });
-            if (!isWalkable(r, c + 1) && isWalkable(r + dr, c + 1))
-                neighbours.push({ row: r + dr, col: c + 1 });
-        }
-        else if (dc !== 0 && dr === 0) {
-            // Moving horizontally
-            if (isWalkable(r, c + dc))
-                neighbours.push({ row: r, col: c + dc });
-            // Forced neighbours: cells blocked vertically from parent but accessible from here
-            if (!isWalkable(r - 1, c) && isWalkable(r - 1, c + dc))
-                neighbours.push({ row: r - 1, col: c + dc });
-            if (!isWalkable(r + 1, c) && isWalkable(r + 1, c + dc))
-                neighbours.push({ row: r + 1, col: c + dc });
-        }
-        return neighbours;
-    }
-    /**
-     * Jump from (r, c) in direction (dr, dc).
-     * Returns the jump point if found, or null if the scan hits a wall/boundary.
-     */
-    function jump(r, c, dr, dc) {
-        if (!isWalkable(r, c))
-            return null;
-        markVisited(r, c);
-        // Reached the goal — this is always a jump point
-        if (r === dst.row && c === dst.col)
-            return { row: r, col: c };
-        // Check for forced neighbours
-        if (dr !== 0 && dc === 0) {
-            // Vertical movement: check for horizontal forced neighbours
-            if ((!isWalkable(r, c - 1) && isWalkable(r + dr, c - 1)) ||
-                (!isWalkable(r, c + 1) && isWalkable(r + dr, c + 1)))
+    function scanH(r, c, dc) {
+        while (walkable(r, c)) {
+            touch(r, c);
+            if (r === dst.row && c === dst.col)
                 return { row: r, col: c };
-        }
-        else if (dc !== 0 && dr === 0) {
-            // Horizontal movement: check for vertical forced neighbours
-            if ((!isWalkable(r - 1, c) && isWalkable(r - 1, c + dc)) ||
-                (!isWalkable(r + 1, c) && isWalkable(r + 1, c + dc)))
+            // Forced neighbours: cells above/below that are blocked at c but open at c+dc
+            if ((!walkable(r - 1, c) && walkable(r - 1, c + dc)) ||
+                (!walkable(r + 1, c) && walkable(r + 1, c + dc)))
                 return { row: r, col: c };
+            c += dc;
         }
-        return jump(r + dr, c + dc, dr, dc);
+        return null;
+    }
+    // ── Iterative vertical scan ──────────────────────────────────────────────────
+    /**
+     * Scan vertically from (r, c) in direction dr (+1 or -1).
+     * Also scans horizontally from each cell to detect jump points.
+     * Returns the first jump point found, or null.
+     */
+    function scanV(r, c, dr) {
+        while (walkable(r, c)) {
+            touch(r, c);
+            if (r === dst.row && c === dst.col)
+                return { row: r, col: c };
+            // Forced neighbours: cells left/right that are blocked at r but open at r+dr
+            if ((!walkable(r, c - 1) && walkable(r + dr, c - 1)) ||
+                (!walkable(r, c + 1) && walkable(r + dr, c + 1)))
+                return { row: r, col: c };
+            // Also scan horizontally from here to find jump points in perpendicular axes
+            if (scanH(r, c + 1, 1) !== null || scanH(r, c - 1, -1) !== null)
+                return { row: r, col: c };
+            r += dr;
+        }
+        return null;
     }
     /**
-     * Identify jump points that are successors of `node`.
+     * Collect all jump point successors of `curr`.
+     * On a 4-directional grid we always scan all 4 cardinal directions from each
+     * expanded jump point (rather than pruning based on parent — full cardinal JPS).
      */
-    function identifySuccessors(node, parentNode) {
-        const neighbours = getPrunedNeighbours(node, parentNode);
-        const successors = [];
-        for (const nb of neighbours) {
-            const dr = Math.sign(nb.row - node.row);
-            const dc = Math.sign(nb.col - node.col);
-            const jp = jump(nb.row, nb.col, dr, dc);
-            if (jp !== null)
-                successors.push(jp);
-        }
-        return successors;
+    function successors(curr) {
+        const result = [];
+        const { row: r, col: c } = curr;
+        // Horizontal scans
+        const rp = scanH(r, c + 1, +1);
+        const rm = scanH(r, c - 1, -1);
+        if (rp)
+            result.push(rp);
+        if (rm)
+            result.push(rm);
+        // Vertical scans
+        const dp = scanV(r + 1, c, +1);
+        const dm = scanV(r - 1, c, -1);
+        if (dp)
+            result.push(dp);
+        if (dm)
+            result.push(dm);
+        return result;
     }
+    // ── Main A* loop over jump points ────────────────────────────────────────────
     const openSet = new MinHeap();
     gCost.set(srcKey, 0);
     parent.set(srcKey, null);
-    openSet.push(manhattan(src, dst), src);
-    markVisited(src.row, src.col);
+    openSet.push(h(src, dst), src);
+    touch(src.row, src.col);
     let found = false;
-    // Map from key → parent point (not just key string, so we can interpolate)
-    const parentPoint = new Map();
-    parentPoint.set(srcKey, null);
     while (openSet.size > 0) {
-        const item = openSet.pop();
-        const curr = item[1];
+        const [, curr] = openSet.pop();
         const currKey = key(curr.row, curr.col);
         if (closed.has(currKey))
             continue;
@@ -194,20 +176,16 @@ function solveJPS(req) {
             break;
         }
         const g = gCost.get(currKey);
-        const parentPt = parentPoint.get(currKey) ?? null;
-        const successors = identifySuccessors(curr, parentPt);
-        for (const jp of successors) {
+        for (const jp of successors(curr)) {
             const jpKey = key(jp.row, jp.col);
             if (closed.has(jpKey))
                 continue;
-            const dist = manhattan(curr, jp); // uniform step cost
-            const newG = g + dist;
+            const newG = g + h(curr, jp); // uniform cost = Manhattan distance
             const existingG = gCost.get(jpKey) ?? Infinity;
             if (newG < existingG) {
                 gCost.set(jpKey, newG);
-                parent.set(jpKey, currKey);
-                parentPoint.set(jpKey, curr);
-                openSet.push(newG + manhattan(jp, dst), jp);
+                parent.set(jpKey, curr);
+                openSet.push(newG + h(jp, dst), jp);
             }
         }
     }
@@ -215,16 +193,20 @@ function solveJPS(req) {
     if (!found) {
         return { visitedNodes: visitedOrder, path: [], nodesVisited: visitedOrder.length, pathLength: 0, timeTaken };
     }
-    // Reconstruct path between jump points and interpolate intermediate cells
+    // ── Path reconstruction ───────────────────────────────────────────────────────
+    // Walk the parent map from dst back to src to get the sequence of jump points
     const jpPath = [];
-    let cur = dstKey;
-    while (cur !== null) {
-        const [r, c] = cur.split(',').map(Number);
-        jpPath.push({ row: r, col: c });
-        cur = parent.get(cur) ?? null;
+    {
+        let k = dstKey;
+        while (k !== null) {
+            const [r, c] = k.split(',').map(Number);
+            jpPath.push({ row: r, col: c });
+            const p = parent.get(k);
+            k = (p !== undefined && p !== null) ? key(p.row, p.col) : null;
+        }
     }
     jpPath.reverse();
-    // Interpolate between consecutive jump points
+    // Interpolate straight-line segments between consecutive jump points
     const path = [];
     for (let i = 0; i < jpPath.length - 1; i++) {
         const from = jpPath[i];

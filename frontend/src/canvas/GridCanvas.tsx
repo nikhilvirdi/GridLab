@@ -145,7 +145,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     setEndPoint(null);
     setRotation(0);
 
-    fetch(`http://localhost:3001/api/maze?size=${size}`)
+    fetch(`http://localhost:3001/api/maze?size=80`)
       .then(res => {
         if (!res.ok) throw new Error(`Failed to fetch maze: ${res.statusText}`);
         return res.json();
