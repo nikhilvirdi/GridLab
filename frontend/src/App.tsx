@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GridCanvas } from './canvas/GridCanvas';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'visualizer' | 'documentation'>('visualizer');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   const isDark = theme === 'dark';
@@ -24,63 +23,6 @@ function App() {
         className="fixed z-50"
         style={{ top: '24px', left: '32px', height: '56px', width: 'auto' }}
       />
-
-      {/* Floating pill navbar — fixed top-center */}
-      <div
-        className="fixed left-1/2 z-50 flex items-center"
-        style={{
-          top: '16px',
-          transform: 'translateX(-50%)',
-          backgroundColor: isDark ? '#111111' : '#e0e0e0',
-          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
-          borderRadius: '12px',
-          padding: '4px',
-          fontSize: '15px',
-        }}
-      >
-        <button
-          onClick={() => setActiveTab('visualizer')}
-          style={{
-            padding: '10px 32px',
-            borderRadius: '8px',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: '15px',
-            backgroundColor:
-              activeTab === 'visualizer'
-                ? isDark ? '#000000' : '#f0f0f0'
-                : 'transparent',
-            color:
-              activeTab === 'visualizer'
-                ? isDark ? '#ffffff' : '#000000'
-                : '#888888',
-          }}
-        >
-          Visualizer
-        </button>
-        <button
-          onClick={() => setActiveTab('documentation')}
-          style={{
-            padding: '10px 32px',
-            borderRadius: '8px',
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            fontSize: '15px',
-            backgroundColor:
-              activeTab === 'documentation'
-                ? isDark ? '#000000' : '#f0f0f0'
-                : 'transparent',
-            color:
-              activeTab === 'documentation'
-                ? isDark ? '#ffffff' : '#000000'
-                : '#888888',
-          }}
-        >
-          Documentation
-        </button>
-      </div>
 
       {/* Theme toggle — fixed top-right */}
       <button
@@ -153,11 +95,7 @@ function App() {
           width: '100%',
         }}
       >
-        {activeTab === 'visualizer' ? (
-          <GridCanvas size={80} theme={theme} />
-        ) : (
-          <div style={{ width: '100%', height: '100%' }} />
-        )}
+        <GridCanvas size={80} theme={theme} />
       </div>
     </div>
   );
