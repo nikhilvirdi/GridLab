@@ -31,19 +31,15 @@ Each algorithm name links to a writeup in `docs/`: theory, pseudocode, complexit
 
 ## Tech Stack
 
-| Layer | Tech | Version |
-|---|---|---|
-| Frontend | React | ^19.2.6 |
-| Frontend | TypeScript | ~6.0.2 |
-| Frontend | Vite | ^8.0.12 |
-| Frontend | Tailwind CSS | ^3.4.19 |
-| Frontend | Framer Motion | ^12.39.0 |
-| Frontend | clsx | ^2.1.1 |
-| Frontend | tailwind-merge | ^3.6.0 |
-| Backend | Node.js / Express | ^4.19.2 |
-| Backend | TypeScript | ^5.4.5 |
-| Backend | cors | ^2.8.5 |
-| Backend | dotenv | ^16.4.5 |
+| Tech | Version |
+|---|---|
+| React | ^19.2.6 |
+| TypeScript | ~6.0.2 |
+| Vite | ^8.0.12 |
+| Tailwind CSS | ^3.4.19 |
+| Framer Motion | ^12.39.0 |
+| clsx | ^2.1.1 |
+| tailwind-merge | ^3.6.0 |
 
 ## Project Link
 
