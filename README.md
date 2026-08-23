@@ -13,7 +13,7 @@ GridLab is built as a split two-tier architecture:
 ```mermaid
 graph TD
     User([User UI Interaction]) --> Frontend[React SPA Client]
-    Frontend -->|GET /api/maze?size=80| Express[Express REST API]
+    Frontend -->|GET /api/maze?size=60| Express[Express REST API]
     Frontend -->|POST /api/solve/:algorithm| Express
     Express --> MazeGen[Maze Generator]
     Express --> Solvers[Pathfinding Solvers]
@@ -70,10 +70,10 @@ GridLab/
 - The page header automatically switches between `/gridlab_logo.png` (dark background) and `/gridlab_logo_lighttheme.png` (light background) with a fixed height and aspect ratio.
 - Custom grid color system adjusted dynamically based on the active theme:
   - **Dark Theme**: Open cells (`#2d2d2d`), Wall cells (`#111111`), Grid lines (`#1a1a1a`).
-  - **Light Theme**: Open cells (`#b0b0b0`), Wall cells (`#787878`), Grid lines (`rgba(0,0,0,0.15)`).
+  - **Light Theme**: Open cells (`#ffffff`), Wall cells (`#1e293b`), Grid lines (`rgba(0,0,0,0.08)`).
 
 ### 2. High-Performance Grid Rendering
-- Grid size is standard-calibrated at **80×80** ($6,400$ cells).
+- Grid size is standard-calibrated at **60×60** ($3,600$ cells).
 - Rendered on a single HTML5 `<canvas>` element at a fixed $640\text{px} \times 640\text{px}$ container size.
 - Detects the device pixel ratio (`window.devicePixelRatio`) to scale coordinates correctly, avoiding blurry cells on high-DPI (Retina) screens.
 - Synchronously updates grid lines and cells during clicks to determine starting (green) and ending (red) points.
@@ -112,7 +112,7 @@ Generates a random N×N grid map with a wall density of approximately 38%.
 
 - **URL**: `/api/maze`
 - **Method**: `GET`
-- **Query Parameter**: `size` (optional, defaults to `80`)
+- **Query Parameter**: `size` (optional, defaults to `60`)
 - **Success Response** (`200 OK`):
   ```json
   {
@@ -121,7 +121,7 @@ Generates a random N×N grid map with a wall density of approximately 38%.
       [0, 0, 1, ...],
       ...
     ],
-    "size": 80
+    "size": 60
   }
   ```
   *(where `0` = open cell, `1` = wall cell)*

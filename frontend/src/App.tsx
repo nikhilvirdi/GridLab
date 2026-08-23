@@ -9,7 +9,7 @@ function App() {
 
   return (
     <div
-      className="overflow-hidden select-none font-mono"
+      className="overflow-hidden select-none"
       style={{
         height: '100vh',
         backgroundColor: isDark ? '#000000' : '#f0f0f0',
@@ -95,7 +95,7 @@ function App() {
           width: '100%',
         }}
       >
-        <GridCanvas size={80} theme={theme} />
+        <GridCanvas size={60} theme={theme} />
       </div>
     </div>
   );

@@ -90,7 +90,7 @@ const ALGO_COMPLEXITY: Record<string, string> = {
 
 const GRID_PX = 640;
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark' }) => {
+export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     setEndPoint(null);
     setRotation(0);
 
-    fetch(`http://localhost:3001/api/maze?size=80`)
+    fetch(`http://localhost:3001/api/maze?size=${size}`)
       .then(res => {
         if (!res.ok) throw new Error(`Failed to fetch maze: ${res.statusText}`);
         return res.json();
@@ -208,7 +208,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     setRotation(prev => prev + 360);
   };
 
-  // Paint a single cell directly on canvas — DO NOT MODIFY
+  // Paint a single cell directly on canvas
   const paintCell = (row: number, col: number, color: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -224,7 +224,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = color;
     ctx.fillRect(x1, y1, w, w);
-    ctx.strokeStyle = themeRef.current === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.15)';
+    ctx.strokeStyle = themeRef.current === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x1, y1, w, w);
     ctx.restore();
@@ -303,7 +303,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     setIsAnimating(false);
   };
 
-  // Run solver — DO NOT MODIFY
+  // Run solver
   const handleRun = async () => {
     if (isRunDisabled || !selectedAlgo || !startPoint || !endPoint) return;
     const slug = ALGO_SLUG[selectedAlgo.id];
@@ -349,7 +349,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     }
   };
 
-  // Draw base grid — DO NOT MODIFY
+  // Draw base grid
   const drawBaseGrid = () => {
     if (isAnimatingRef.current) return;
     const canvas = canvasRef.current;
@@ -366,26 +366,27 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     canvas.style.height = `${S}px`;
     ctx.scale(dpr, dpr);
 
-    ctx.fillStyle = theme === 'dark' ? '#0d0d0d' : '#f5f5f5';
+    ctx.fillStyle = theme === 'dark' ? '#0d0d0d' : '#ffffff';
     ctx.fillRect(0, 0, S, S);
 
     if (error) {
       ctx.fillStyle = '#ff1744';
-      ctx.font = '14px "JetBrains Mono","Fira Code",monospace';
+      ctx.font = '14px "DM Sans",sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('BACKEND ERROR', S / 2, S / 2 - 10);
       ctx.fillStyle = '#888888';
-      ctx.font = '10px "JetBrains Mono","Fira Code",monospace';
+      ctx.font = '10px "DM Sans",sans-serif';
       ctx.fillText(error.substring(0, 45), S / 2, S / 2 + 15);
       return;
     }
 
+    const wallColor = theme === 'dark' ? '#111111' : '#1e293b';
+    const openColor = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         const isWall = !loading && grid.length > 0 && grid[r]?.[c] === 1;
-        const wallColor = theme === 'dark' ? '#111111' : '#787878';
-        const openColor = theme === 'dark' ? '#2d2d2d' : '#b0b0b0';
         if (startPoint && startPoint.r === r && startPoint.c === c) {
           ctx.fillStyle = '#00e676';
         } else if (endPoint && endPoint.r === r && endPoint.c === c) {
@@ -401,7 +402,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
       }
     }
 
-    ctx.strokeStyle = theme === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.15)';
+    ctx.strokeStyle = theme === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i <= size; i++) {
@@ -412,20 +413,47 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
     ctx.stroke();
 
     if (loading) {
-      ctx.fillStyle = theme === 'dark' ? 'rgba(13,13,13,0.6)' : 'rgba(245,245,245,0.6)';
+      ctx.fillStyle = theme === 'dark' ? 'rgba(13,13,13,0.6)' : 'rgba(255,255,255,0.7)';
       ctx.fillRect(0, 0, S, S);
-      ctx.fillStyle = '#ffd700';
-      ctx.font = '14px "JetBrains Mono","Fira Code",monospace';
+      ctx.fillStyle = theme === 'dark' ? '#ffd700' : '#b45309';
+      ctx.font = '14px "DM Sans",sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('GENERATING GRID...', S / 2, S / 2);
     }
   };
 
-  useEffect(() => {
-    if (isAnimating || showStats) return;
+  const redrawCurrentState = () => {
+    if (isAnimatingRef.current) return;
     drawBaseGrid();
-  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, showStats, theme]);
+    if (solveResult) {
+      for (const pt of solveResult.visitedNodes) {
+        const isStart = pt.row === startPoint?.r && pt.col === startPoint?.c;
+        const isEnd   = pt.row === endPoint?.r   && pt.col === endPoint?.c;
+        if (!isStart && !isEnd) {
+          paintCell(pt.row, pt.col, '#1a7fd4');
+        }
+      }
+      for (const pt of solveResult.path) {
+        const isStart = pt.row === startPoint?.r && pt.col === startPoint?.c;
+        const isEnd   = pt.row === endPoint?.r   && pt.col === endPoint?.c;
+        if (!isStart && !isEnd) {
+          paintCell(pt.row, pt.col, '#f5c518');
+        }
+      }
+      if (startPoint) paintCell(startPoint.r, startPoint.c, '#00e676');
+      if (endPoint) paintCell(endPoint.r, endPoint.c, '#ff1744');
+    }
+  };
+
+  useEffect(() => {
+    if (isAnimating) return;
+    if (solveResult) {
+      redrawCurrentState();
+    } else {
+      drawBaseGrid();
+    }
+  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme]);
 
   // ─── Styling tokens ───────────────────────────────────────────────────────
   const borderColor  = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
@@ -439,7 +467,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
 
   return (
     <div
-      className="flex flex-row font-mono select-none"
+      className="flex flex-row select-none"
       style={{ width: '100%', height: '100%' }}
     >
       {/* Fullscreen loader */}
@@ -469,14 +497,15 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
           flexShrink: 0,
         }}
       >
-        {/* Grid container — exactly 520×520px, never percentage */}
+        {/* Grid container — exactly 640×640px, never percentage */}
         <div
           ref={containerRef}
           style={{
             width: `${GRID_PX}px`,
             height: `${GRID_PX}px`,
             flexShrink: 0,
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            backgroundColor: isDark ? '#0d0d0d' : '#ffffff',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
             borderRadius: '4px',
             overflow: 'hidden',
             position: 'relative',
@@ -528,12 +557,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
             <button
               onClick={handleReset}
               title="Reset Grid"
+              aria-label="Reset Grid"
               style={{
                 width: `${CTRL_H}px`,
                 height: `${CTRL_H}px`,
                 minWidth: `${CTRL_H}px`,
                 minHeight: `${CTRL_H}px`,
-                borderRadius: '50%',
+                borderRadius: '10px',
                 backgroundColor: panelBg,
                 border: `1px solid ${borderColor}`,
                 display: 'flex',
@@ -542,6 +572,13 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
                 cursor: 'pointer',
                 flexShrink: 0,
                 padding: 0,
+                transition: 'background-color 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = panelBg;
               }}
             >
               <motion.svg
@@ -557,7 +594,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </motion.svg>
             </button>
@@ -598,28 +635,29 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 80, theme = 'dark
                     transition: 'transform 0.2s',
                   }}
                 >
-                  <polyline points="6 15 12 9 18 15" />
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
               </button>
 
-              {/* Dropdown menu — opens upward */}
+              {/* Dropdown menu — opens downward */}
               <AnimatePresence>
                 {isDropdownOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
+                    exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                     style={{
                       position: 'absolute',
-                      bottom: '100%',
-                      marginBottom: '8px',
+                      top: '100%',
+                      marginTop: '8px',
                       left: 0,
                       width: `${DROPDOWN_W}px`,
                       borderRadius: '10px',
                       overflow: 'hidden',
                       backgroundColor: panelBg,
                       border: `1px solid ${borderColor}`,
+                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
                       zIndex: 50,
                     }}
                   >
