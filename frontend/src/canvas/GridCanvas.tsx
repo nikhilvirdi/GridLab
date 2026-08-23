@@ -462,8 +462,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
 
   const CONTENT_W   = 420;
   const CTRL_H      = 48;
-  const SECTION_GAP = 28;
-  const DROPDOWN_W  = 260;
+  const SECTION_GAP = 20;
 
   return (
     <div
@@ -551,7 +550,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
         >
 
           {/* ── Controls row: Reset | Dropdown | RUN ── */}
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', width: '100%' }}>
 
             {/* Reset button */}
             <button
@@ -600,12 +599,12 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
             </button>
 
             {/* Algorithm dropdown */}
-            <div ref={dropdownRef} style={{ position: 'relative', width: `${DROPDOWN_W}px`, flexShrink: 0 }}>
+            <div ref={dropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
               <button
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
                 disabled={isAnimating}
                 style={{
-                  width: `${DROPDOWN_W}px`,
+                  width: '100%',
                   height: `${CTRL_H}px`,
                   borderRadius: '10px',
                   backgroundColor: panelBg,
@@ -652,7 +651,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                       top: '100%',
                       marginTop: '8px',
                       left: 0,
-                      width: `${DROPDOWN_W}px`,
+                      width: '100%',
                       borderRadius: '10px',
                       overflow: 'hidden',
                       backgroundColor: panelBg,
@@ -719,7 +718,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
               onClick={handleRun}
               style={{
                 height: `${CTRL_H}px`,
-                padding: '0 40px',
+                width: '100px',
                 borderRadius: '10px',
                 backgroundColor: panelBg,
                 border: isRunDisabled
@@ -754,32 +753,6 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
               )}
             </button>
           </div>
-
-          {/* ── Algorithm description — fades in on selection ── */}
-          <AnimatePresence mode="wait">
-            {selectedAlgo && (
-              <motion.p
-                key={selectedAlgo.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{
-                  fontSize: '13px',
-                  color: isDark ? '#888888' : '#000000',
-                  fontFamily: 'inherit',
-                  lineHeight: 1.45,
-                  margin: 0,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {selectedAlgo.description}
-              </motion.p>
-            )}
-          </AnimatePresence>
 
           {/* ── Speed slider + STOP — visible during animation only ── */}
           <AnimatePresence>
@@ -941,7 +914,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                             >
                               <span
                                 style={{
-                                  fontSize: '13px',
+                                  fontSize: '15px',
                                   color: isDark ? '#888888' : '#000000',
                                   fontFamily: 'inherit',
                                 }}
@@ -950,15 +923,16 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                               </span>
                               <span
                                 style={{
-                                  fontSize: '14px',
+                                  fontSize: '16px',
                                   color: isDark ? '#ffffff' : '#000000',
                                   fontFamily: 'inherit',
-                                  padding: '4px 16px',
+                                  padding: '4px 14px',
                                   borderRadius: '6px',
                                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
                                   backgroundColor: valueBoxBg,
                                   minWidth: '48px',
                                   textAlign: 'center',
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {row.value}
