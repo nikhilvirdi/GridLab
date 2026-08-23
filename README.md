@@ -20,37 +20,30 @@ Six algorithms, six different ways of exploring the same grid:
 
 | Algorithm | Description | Time Complexity | Explores | Guarantees Shortest Path |
 |---|---|---|---|---|
-| BFS | Explores all neighbors level by level. | O(V + E) | All directions, level by level | Yes (unweighted grids) |
-| DFS | Explores as deep as possible before backtracking. | O(V + E) | Depth-first, backtracks on dead ends | No |
-| A\* | Uses heuristics to find the shortest path efficiently. Evaluates f(n) = g(n) + h(n). | O(E log V) | Heuristic-guided | Yes (unweighted grids) |
-| JPS | An optimized version of A* for grid maps. Jumps over nodes to speed up path calculation. | O(E log V) | Heuristic-guided, jumps over nodes | Yes (unweighted grids) |
-| Bi-BFS | Runs two simultaneous breadth-first searches from start and end. Meets in the middle. | O(b^(d/2)) | Bidirectional, meets in the middle | Yes (unweighted grids) |
-| Greedy | Explores nodes based on heuristic estimate of distance to end. Fast but not optimal. | O(E log V) | Heuristic-guided | No |
+| [BFS](docs/bfs.md) | Explores all neighbors level by level. | O(V + E) | All directions, level by level | Yes (unweighted grids) |
+| [DFS](docs/dfs.md) | Explores as deep as possible before backtracking. | O(V + E) | Depth-first, backtracks on dead ends | No |
+| [A\*](docs/astar.md) | Uses heuristics to find the shortest path efficiently. Evaluates f(n) = g(n) + h(n). | O(E log V) | Heuristic-guided | Yes (unweighted grids) |
+| [JPS](docs/jps.md) | An optimized version of A* for grid maps. Jumps over nodes to speed up path calculation. | O(E log V) | Heuristic-guided, jumps over nodes | Yes (unweighted grids) |
+| [Bi-BFS](docs/bidirectional-bfs.md) | Runs two simultaneous breadth-first searches from start and end. Meets in the middle. | O(b^(d/2)) | Bidirectional, meets in the middle | Yes (unweighted grids) |
+| [Greedy](docs/greedy.md) | Explores nodes based on heuristic estimate of distance to end. Fast but not optimal. | O(E log V) | Heuristic-guided | No |
 
-Detailed writeups for each one (theory, pseudocode, complexity derivation, real-world use cases) are planned for a `docs/` folder. Not there yet. Will link once it exists.
+Each algorithm name links to a writeup in `docs/`: theory, pseudocode, complexity derivation, implementations in Java/C++/Python/JS, trade-offs, and real-world use cases.
 
 ## Tech Stack
 
-**Frontend**
-
-| Tech | Version |
-|---|---|
-| React | ^19.2.6 |
-| TypeScript | ~6.0.2 |
-| Vite | ^8.0.12 |
-| Tailwind CSS | ^3.4.19 |
-| Framer Motion | ^12.39.0 |
-| clsx | ^2.1.1 |
-| tailwind-merge | ^3.6.0 |
-
-**Backend**
-
-| Tech | Version |
-|---|---|
-| Node.js / Express | ^4.19.2 |
-| TypeScript | ^5.4.5 |
-| cors | ^2.8.5 |
-| dotenv | ^16.4.5 |
+| Layer | Tech | Version |
+|---|---|---|
+| Frontend | React | ^19.2.6 |
+| Frontend | TypeScript | ~6.0.2 |
+| Frontend | Vite | ^8.0.12 |
+| Frontend | Tailwind CSS | ^3.4.19 |
+| Frontend | Framer Motion | ^12.39.0 |
+| Frontend | clsx | ^2.1.1 |
+| Frontend | tailwind-merge | ^3.6.0 |
+| Backend | Node.js / Express | ^4.19.2 |
+| Backend | TypeScript | ^5.4.5 |
+| Backend | cors | ^2.8.5 |
+| Backend | dotenv | ^16.4.5 |
 
 ## Project Link
 
