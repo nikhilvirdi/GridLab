@@ -88,9 +88,9 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   greedy: 'O(E log V)',
 };
 
-const GRID_PX = 640;
+const GRID_PX = 480;
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark' }) => {
+export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -456,7 +456,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
   }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme]);
 
   // ─── Styling tokens ───────────────────────────────────────────────────────
-  const borderColor  = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+  const borderColor  = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
   const panelBg      = isDark ? '#111111' : '#e0e0e0';
   const valueBoxBg   = isDark ? '#1a1a1a' : '#d8d8d8';
 
@@ -496,15 +496,16 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
           flexShrink: 0,
         }}
       >
-        {/* Grid container — exactly 640×640px, never percentage */}
+        {/* Grid container */}
         <div
           ref={containerRef}
           style={{
             width: `${GRID_PX}px`,
             height: `${GRID_PX}px`,
+            boxSizing: 'content-box',
             flexShrink: 0,
             backgroundColor: isDark ? '#0d0d0d' : '#ffffff',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)'}`,
+            border: `2px solid ${borderColor}`,
             borderRadius: '4px',
             overflow: 'hidden',
             position: 'relative',
@@ -564,7 +565,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 minHeight: `${CTRL_H}px`,
                 borderRadius: '10px',
                 backgroundColor: panelBg,
-                border: `1px solid ${borderColor}`,
+                border: `2px solid ${borderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -608,7 +609,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   height: `${CTRL_H}px`,
                   borderRadius: '10px',
                   backgroundColor: panelBg,
-                  border: `1px solid ${borderColor}`,
+                  border: `2px solid ${borderColor}`,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -646,18 +647,20 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
                     style={{
                       position: 'absolute',
                       top: '100%',
                       marginTop: '8px',
                       left: 0,
                       width: '100%',
+                      maxHeight: '168px',
+                      overflowY: 'auto',
                       borderRadius: '10px',
-                      overflow: 'hidden',
                       backgroundColor: panelBg,
-                      border: `1px solid ${borderColor}`,
+                      border: `2px solid ${borderColor}`,
                       boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
-                      zIndex: 50,
+                      zIndex: 100,
                     }}
                   >
                     {ALGORITHMS.map((algo, idx) => (
@@ -694,7 +697,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                           e.currentTarget.style.backgroundColor = panelBg;
                         }}
                       >
-                        <span>{algo.name} ({algo.tag})</span>
+                        <span>{algo.name}</span>
                         <span
                           style={{
                             fontSize: '9px',
@@ -722,8 +725,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 borderRadius: '10px',
                 backgroundColor: panelBg,
                 border: isRunDisabled
-                  ? `1px solid ${borderColor}`
-                  : '1px solid rgba(0,230,118,0.4)',
+                  ? `2px solid ${borderColor}`
+                  : '2px solid rgba(0,230,118,0.5)',
                 fontFamily: 'inherit',
                 fontSize: '14px',
                 fontWeight: 700,
@@ -820,7 +823,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                     height: `${CTRL_H}px`,
                     borderRadius: '10px',
                     backgroundColor: panelBg,
-                    border: `1px solid ${borderColor}`,
+                    border: `2px solid ${borderColor}`,
                     color: isDark ? '#ffffff' : '#000000',
                     fontFamily: 'inherit',
                     fontSize: '15px',
@@ -841,7 +844,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                       style={{
                         width: `${CONTENT_W}px`,
                         borderRadius: '12px',
-                        border: `1px solid ${borderColor}`,
+                        border: `2px solid ${borderColor}`,
                         backgroundColor: isDark ? '#111111' : '#e0e0e0',
                         padding: '20px',
                         overflow: 'hidden',
@@ -908,7 +911,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                                 minHeight: '52px',
                                 borderBottom:
                                   idx < 3
-                                    ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                                    ? `1px solid ${borderColor}`
                                     : 'none',
                               }}
                             >
@@ -928,7 +931,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                                   fontFamily: 'inherit',
                                   padding: '4px 14px',
                                   borderRadius: '6px',
-                                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`,
+                                  border: `1px solid ${borderColor}`,
                                   backgroundColor: valueBoxBg,
                                   minWidth: '48px',
                                   textAlign: 'center',

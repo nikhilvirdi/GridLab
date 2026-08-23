@@ -13,7 +13,7 @@ GridLab is built as a split two-tier architecture:
 ```mermaid
 graph TD
     User([User UI Interaction]) --> Frontend[React SPA Client]
-    Frontend -->|GET /api/maze?size=60| Express[Express REST API]
+    Frontend -->|GET /api/maze?size=50| Express[Express REST API]
     Frontend -->|POST /api/solve/:algorithm| Express
     Express --> MazeGen[Maze Generator]
     Express --> Solvers[Pathfinding Solvers]
@@ -73,8 +73,8 @@ GridLab/
   - **Light Theme**: Open cells (`#ffffff`), Wall cells (`#1e293b`), Grid lines (`rgba(0,0,0,0.08)`).
 
 ### 2. High-Performance Grid Rendering
-- Grid size is standard-calibrated at **60×60** ($3,600$ cells).
-- Rendered on a single HTML5 `<canvas>` element at a fixed $640\text{px} \times 640\text{px}$ container size.
+- Grid size is standard-calibrated at **50×50** ($2,500$ cells).
+- Rendered on a single HTML5 `<canvas>` element at a fixed $480\text{px} \times 480\text{px}$ container size matching the side panel block height.
 - Detects the device pixel ratio (`window.devicePixelRatio`) to scale coordinates correctly, avoiding blurry cells on high-DPI (Retina) screens.
 - Synchronously updates grid lines and cells during clicks to determine starting (green) and ending (red) points.
 
@@ -112,7 +112,7 @@ Generates a random N×N grid map with a wall density of approximately 38%.
 
 - **URL**: `/api/maze`
 - **Method**: `GET`
-- **Query Parameter**: `size` (optional, defaults to `60`)
+- **Query Parameter**: `size` (optional, defaults to `50`)
 - **Success Response** (`200 OK`):
   ```json
   {
@@ -121,7 +121,7 @@ Generates a random N×N grid map with a wall density of approximately 38%.
       [0, 0, 1, ...],
       ...
     ],
-    "size": 60
+    "size": 50
   }
   ```
   *(where `0` = open cell, `1` = wall cell)*

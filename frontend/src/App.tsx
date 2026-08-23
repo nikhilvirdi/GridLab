@@ -95,7 +95,7 @@ function App() {
           width: '100%',
         }}
       >
-        <GridCanvas size={60} theme={theme} />
+        <GridCanvas size={50} theme={theme} />
       </div>
     </div>
   );

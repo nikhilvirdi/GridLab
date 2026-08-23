@@ -99,3 +99,26 @@ input[type='range'].speed-slider-light::-moz-range-thumb {
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+/* Custom scrollbars for dropdown menus */
+.custom-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.custom-scroll-light::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scroll-light::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll-light::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
