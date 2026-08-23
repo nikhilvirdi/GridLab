@@ -1,11 +1,10 @@
-<img width="200" height="50" alt="dark theme logo" src="https://github.com/user-attachments/assets/20e743e5-fdae-4e7c-b562-2cc414a55182" />
-<img width="200" height="50" alt="light theme logo" src="https://github.com/user-attachments/assets/2a85b1b3-0121-4cfb-8bb6-ae372f5a43a5" />
-
-
+# GridLab
 
 A grid-based pathfinding visualizer. Pick two points, pick an algorithm, watch it search.
 
-<!-- paste logo here -->
+<img width="200" height="50" alt="dark theme logo" src="https://github.com/user-attachments/assets/20e743e5-fdae-4e7c-b562-2cc414a55182" />
+<img width="200" height="50" alt="light theme logo" src="https://github.com/user-attachments/assets/2a85b1b3-0121-4cfb-8bb6-ae372f5a43a5" />
+
 
 ## About GridLab
 
@@ -13,9 +12,11 @@ GridLab is a mini project I built for my CSE 4th semester Design and Analysis of
 
 It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and turned into a small tool I kept polishing.
 
-## Screenshots
+<img width="1918" height="1013" alt="inital screenshot" src="https://github.com/user-attachments/assets/a2231f02-303f-4e82-a245-2be4320215bd" />
 
-<!-- add screenshots here: dark mode, light mode, an algorithm mid-run with stats panel open -->
+<img width="1918" height="987" alt="final screenshot" src="https://github.com/user-attachments/assets/d2057185-e5bb-4ba7-ad45-a0ed2d0d631a" />
+
+
 
 ## Algorithms
 
