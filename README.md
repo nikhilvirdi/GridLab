@@ -13,7 +13,7 @@ GridLab is a mini project I built for my CSE 4th semester Design and Analysis of
 It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and turned into a small tool I kept polishing.
 
 <img width="1918" height="1013" alt="inital screenshot" src="https://github.com/user-attachments/assets/a2231f02-303f-4e82-a245-2be4320215bd" />
-<img width="1918" height="987" alt="final screenshot" src="https://github.com/user-attachments/assets/d2057185-e5bb-4ba7-ad45-a0ed2d0d631a" />
+<img width="1918" height="977" alt="final screenshot" src="https://github.com/user-attachments/assets/8e3dd516-6709-4347-bb9a-4f37608c0aa7" />
 
 
 ## Algorithms
