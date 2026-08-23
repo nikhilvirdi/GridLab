@@ -1,199 +1,57 @@
-# GridLab — Pathfinding Visualizer & Simulator
+# GridLab
 
-GridLab is an interactive, premium web application designed to simulate and visualize pathfinding algorithms on dense 2D grid maps. It provides a visual playground for comparing different graph traversal techniques, understanding their search spaces, and evaluating their execution efficiencies.
+A grid-based pathfinding visualizer. Pick two points, pick an algorithm, watch it search.
 
----
+<!-- paste logo here -->
 
-## 🏗️ System Architecture
+## About GridLab
 
-GridLab is built as a split two-tier architecture:
-- **Frontend Visualizer**: A React + Vite SPA (Single Page Application) written in TypeScript. It utilizes the HTML5 Canvas API for high-performance rendering of dense cell grids, custom CSS/Tailwind for a premium dark/light layout, and Framer Motion for smooth micro-animations.
-- **Backend Solver**: An Express REST API built with Node.js and TypeScript. It handles randomized maze generation and runs the graph traversal solvers on CPU threads, returning coordinate path sequences back to the client.
+GridLab is a mini project I built for my CSE 4th semester Design and Analysis of Algorithms (DAA) coursework. It's a 50×50 interactive grid where you can place walls, set a start and end point, and watch six different pathfinding algorithms explore in real time. Live stats show nodes visited, path length, time taken, and complexity for each run.
 
-```mermaid
-graph TD
-    User([User UI Interaction]) --> Frontend[React SPA Client]
-    Frontend -->|GET /api/maze?size=50| Express[Express REST API]
-    Frontend -->|POST /api/solve/:algorithm| Express
-    Express --> MazeGen[Maze Generator]
-    Express --> Solvers[Pathfinding Solvers]
-    Solvers -->|BFS / DFS / A* / JPS / Bi-BFS / Greedy| Express
-    Express -->|Coordinate lists & statistics| Frontend
-    Frontend -->|HTML5 Canvas Renderer| Screen[Screen Rendering & Animation]
-```
+It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and turned into a small tool I kept polishing.
 
----
+## Screenshots
 
-## 📁 Directory Structure
+<!-- add screenshots here: dark mode, light mode, an algorithm mid-run with stats panel open -->
 
-```
-GridLab/
-├── backend/
-│   ├── src/
-│   │   ├── algorithms/       # Core pathfinding solvers & maze generation
-│   │   │   ├── astar.ts       # A* Search Algorithm
-│   │   │   ├── bfs.ts         # Breadth-First Search
-│   │   │   ├── bidirectional-bfs.ts  # Bidirectional BFS
-│   │   │   ├── dfs.ts         # Depth-First Search
-│   │   │   ├── greedy.ts      # Greedy Best-First Search
-│   │   │   ├── jps.ts         # Jump Point Search (JPS)
-│   │   │   ├── maze.ts        # Randomized Maze Generator
-│   │   │   └── types.ts       # Shared TypeScript Type definitions
-│   │   └── index.ts          # Express Server configuration & REST API routes
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── public/               # Static assets (Logos, Icons)
-│   │   ├── gridlab_logo.png
-│   │   └── gridlab_logo_lighttheme.png
-│   ├── src/
-│   │   ├── canvas/
-│   │   │   └── GridCanvas.tsx # Main grid rendering & control dashboard
-│   │   ├── components/
-│   │   │   ├── LoaderOne.tsx  # Interactive fullscreen loading transition
-│   │   │   └── StatsTable.tsx # Visualization metrics table component
-│   │   ├── App.tsx           # Layout Shell & Global State Coordinator
-│   │   ├── App.css           # Local style overrides
-│   │   ├── index.css         # Theme tokens & global CSS structure
-│   │   └── main.tsx          # React application entry point
-│   ├── package.json
-│   └── vite.config.ts
-└── README.md                 # Primary Workspace Documentation
-```
+## Algorithms
 
----
+Six algorithms, six different ways of exploring the same grid:
 
-## ⚡ Key Technical Features
+| Algorithm | Description | Time Complexity | Explores | Guarantees Shortest Path |
+|---|---|---|---|---|
+| BFS | Explores all neighbors level by level. | O(V + E) | All directions, level by level | Yes (unweighted grids) |
+| DFS | Explores as deep as possible before backtracking. | O(V + E) | Depth-first, backtracks on dead ends | No |
+| A\* | Uses heuristics to find the shortest path efficiently. Evaluates f(n) = g(n) + h(n). | O(E log V) | Heuristic-guided | Yes (unweighted grids) |
+| JPS | An optimized version of A* for grid maps. Jumps over nodes to speed up path calculation. | O(E log V) | Heuristic-guided, jumps over nodes | Yes (unweighted grids) |
+| Bi-BFS | Runs two simultaneous breadth-first searches from start and end. Meets in the middle. | O(b^(d/2)) | Bidirectional, meets in the middle | Yes (unweighted grids) |
+| Greedy | Explores nodes based on heuristic estimate of distance to end. Fast but not optimal. | O(E log V) | Heuristic-guided | No |
 
-### 1. Dual Theme System & Logo Support
-- Dynamic style toggling between **Dark Theme** and **Light Theme**.
-- The page header automatically switches between `/gridlab_logo.png` (dark background) and `/gridlab_logo_lighttheme.png` (light background) with a fixed height and aspect ratio.
-- Custom grid color system adjusted dynamically based on the active theme:
-  - **Dark Theme**: Open cells (`#2d2d2d`), Wall cells (`#111111`), Grid lines (`#1a1a1a`).
-  - **Light Theme**: Open cells (`#ffffff`), Wall cells (`#1e293b`), Grid lines (`rgba(0,0,0,0.08)`).
+Detailed writeups for each one (theory, pseudocode, complexity derivation, real-world use cases) are planned for a `docs/` folder. Not there yet. Will link once it exists.
 
-### 2. High-Performance Grid Rendering
-- Grid size is standard-calibrated at **50×50** ($2,500$ cells).
-- Rendered on a single HTML5 `<canvas>` element at a fixed $480\text{px} \times 480\text{px}$ container size matching the side panel block height.
-- Detects the device pixel ratio (`window.devicePixelRatio`) to scale coordinates correctly, avoiding blurry cells on high-DPI (Retina) screens.
-- Synchronously updates grid lines and cells during clicks to determine starting (green) and ending (red) points.
+## Tech Stack
 
-### 3. Grid Animating Engine
-- Animates algorithm behavior in real-time:
-  - **Visited Nodes**: Painted in blue (`#1a7fd4`) sequentially.
-  - **Shortest Path**: Traced in yellow (`#f5c518`) once the path search concludes.
-- Speed slider supports three delay intervals based on user preference:
-  - **Fast**: $5\text{ms}$ delay per cell visit.
-  - **Medium**: $20\text{ms}$ delay per cell visit.
-  - **Slow**: $50\text{ms}$ delay per cell visit.
-- Supports asynchronous cancellation using the **STOP** button to freeze the loop.
+**Frontend**
 
----
+| Tech | Version |
+|---|---|
+| React | ^19.2.6 |
+| TypeScript | ~6.0.2 |
+| Vite | ^8.0.12 |
+| Tailwind CSS | ^3.4.19 |
+| Framer Motion | ^12.39.0 |
+| clsx | ^2.1.1 |
+| tailwind-merge | ^3.6.0 |
 
-## 🧠 Pathfinding Algorithms Offered
+**Backend**
 
-| Algorithm | Tag | Theoretical Time Complexity | Shortest Path Guarantee | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **BFS** | BASIC | $O(V + E)$ | **Yes** | Explores level by level; optimal for unweighted grids. |
-| **DFS** | BASIC | $O(V + E)$ | No | Explores as deep as possible before backtracking; fast exploration. |
-| **A\*** | CORE | $O(E \log V)$ | **Yes** | Uses Manhattan Distance heuristic to prioritize node expansion. |
-| **JPS** | OPTIMIZED | $O(E \log V)$ | **Yes** | Prunes symmetry on grid maps by jumping over empty cells. |
-| **Bi-BFS** | ADVANCED | $O(b^{d/2})$ | **Yes** | Performs concurrent BFS searches from start and end nodes. |
-| **Greedy** | ADVANCED | $O(E \log V)$ | No | Selects nodes solely based on distance heuristic; fast but sub-optimal. |
+| Tech | Version |
+|---|---|
+| Node.js / Express | ^4.19.2 |
+| TypeScript | ^5.4.5 |
+| cors | ^2.8.5 |
+| dotenv | ^16.4.5 |
 
----
+## Project Link
 
-## 🔌 API Documentation
-
-All payloads are exchanged in JSON format.
-
-### 1. Generate Maze
-Generates a random N×N grid map with a wall density of approximately 38%.
-
-- **URL**: `/api/maze`
-- **Method**: `GET`
-- **Query Parameter**: `size` (optional, defaults to `50`)
-- **Success Response** (`200 OK`):
-  ```json
-  {
-    "grid": [
-      [0, 1, 0, ...],
-      [0, 0, 1, ...],
-      ...
-    ],
-    "size": 50
-  }
-  ```
-  *(where `0` = open cell, `1` = wall cell)*
-
----
-
-### 2. Solve Maze
-Computes a pathfinding trajectory from the start to the end coordinate.
-
-- **URL**: `/api/solve/:algorithm`
-  - Valid paths: `/api/solve/bfs`, `/api/solve/dfs`, `/api/solve/astar`, `/api/solve/jps`, `/api/solve/bidirectional-bfs`, `/api/solve/greedy`
-- **Method**: `POST`
-- **Request Body**:
-  ```json
-  {
-    "grid": [[0, 1, 0], [0, 0, 0]],
-    "start": { "row": 0, "col": 0 },
-    "end": { "row": 1, "col": 2 }
-  }
-  ```
-- **Success Response** (`200 OK`):
-  ```json
-  {
-    "visitedNodes": [
-      { "row": 0, "col": 0 },
-      { "row": 0, "col": 2 },
-      ...
-    ],
-    "path": [
-      { "row": 0, "col": 0 },
-      { "row": 1, "col": 1 },
-      { "row": 1, "col": 2 }
-    ],
-    "nodesVisited": 8,
-    "pathLength": 3,
-    "timeTaken": 1.25
-  }
-  ```
-
----
-
-## 🛠️ Local Setup & Running Instructions
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v16+ recommended)
-- npm or yarn package manager
-
-### 1. Clone the repository and install dependencies
-```bash
-# Navigate to backend and install
-cd backend
-npm install
-
-# Navigate to frontend and install
-cd ../frontend
-npm install
-```
-
-### 2. Start Servers
-
-You can run both backend and frontend servers concurrently.
-
-#### Start Backend Server:
-```bash
-cd backend
-npm run dev
-```
-The server starts on `http://localhost:3001`.
-
-#### Start Frontend Client:
-```bash
-cd frontend
-npm run dev
-```
-Vite will start the client interface on `http://localhost:5173`.
+<!-- add live deployed link here once GitHub Pages deploy is done -->
