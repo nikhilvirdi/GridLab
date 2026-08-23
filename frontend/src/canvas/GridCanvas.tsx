@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoaderOne from '../components/LoaderOne';
+import { generateMaze } from '../algorithms/maze';
+import { solveBFS } from '../algorithms/bfs';
+import { solveDFS } from '../algorithms/dfs';
+import { solveAStar } from '../algorithms/astar';
+import { solveJPS } from '../algorithms/jps';
+import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
+import { solveGreedy } from '../algorithms/greedy';
 
 interface Point {
   r: number;
@@ -34,13 +41,16 @@ interface AlgorithmOption {
   description: string;
 }
 
-const ALGO_SLUG: Record<string, string> = {
-  bfs: 'bfs',
-  dfs: 'dfs',
-  astar: 'astar',
-  jps: 'jps',
-  'bidirectional-bfs': 'bidirectional-bfs',
-  greedy: 'greedy',
+const ALGO_SOLVERS: Record<
+  string,
+  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint }) => SolveResult
+> = {
+  bfs: solveBFS,
+  dfs: solveDFS,
+  astar: solveAStar,
+  jps: solveJPS,
+  'bidirectional-bfs': solveBidirectionalBFS,
+  greedy: solveGreedy,
 };
 
 const ALGORITHMS: AlgorithmOption[] = [
@@ -103,7 +113,6 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: GRID_PX, height: GRID_PX });
-  const [gridSizePx] = useState(GRID_PX);
 
   // Points
   const [startPoint, setStartPoint] = useState<Point | null>(null);
@@ -145,13 +154,18 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
     setEndPoint(null);
     setRotation(0);
 
-    fetch(`http://localhost:3001/api/maze?size=${size}`)
-      .then(res => {
-        if (!res.ok) throw new Error(`Failed to fetch maze: ${res.statusText}`);
-        return res.json();
-      })
-      .then(data => { if (active) { setGrid(data.grid); setLoading(false); } })
-      .catch(err => { if (active) { setError(err.message || 'Backend error'); setLoading(false); } });
+    try {
+      const newGrid = generateMaze(size);
+      if (active) {
+        setGrid(newGrid);
+        setLoading(false);
+      }
+    } catch (err: any) {
+      if (active) {
+        setError(err?.message || 'Maze generation error');
+        setLoading(false);
+      }
+    }
 
     return () => { active = false; };
   }, [size]);
@@ -306,8 +320,8 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
   // Run solver
   const handleRun = async () => {
     if (isRunDisabled || !selectedAlgo || !startPoint || !endPoint) return;
-    const slug = ALGO_SLUG[selectedAlgo.id];
-    if (!slug) return;
+    const solver = ALGO_SOLVERS[selectedAlgo.id];
+    if (!solver) return;
 
     setIsFetching(true);
     setNoPathFound(false);
@@ -316,17 +330,11 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
     setStatsPanelOpen(false);
 
     try {
-      const res = await fetch(`http://localhost:3001/api/solve/${slug}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grid,
-          start: { row: startPoint.r, col: startPoint.c },
-          end:   { row: endPoint.r,   col: endPoint.c   },
-        }),
+      const data: SolveResult = solver({
+        grid,
+        start: { row: startPoint.r, col: startPoint.c },
+        end:   { row: endPoint.r,   col: endPoint.c   },
       });
-      if (!res.ok) throw new Error(`Server error: ${res.status}`);
-      const data: SolveResult = await res.json();
 
       if (data.visitedNodes.length === 0 && data.path.length === 0 && data.nodesVisited === 0) {
         setInvalidPlacement(true);
