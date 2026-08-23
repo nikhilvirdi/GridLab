@@ -5,7 +5,6 @@ A grid-based pathfinding visualizer. Pick two points, pick an algorithm, watch i
 <img width="200" height="50" alt="dark theme logo" src="https://github.com/user-attachments/assets/20e743e5-fdae-4e7c-b562-2cc414a55182" />
 <img width="200" height="50" alt="light theme logo" src="https://github.com/user-attachments/assets/2a85b1b3-0121-4cfb-8bb6-ae372f5a43a5" />
 
-
 ## About GridLab
 
 GridLab is a mini project I built for my CSE 4th semester Design and Analysis of Algorithms (DAA) coursework. It's a 50×50 interactive grid where you can place walls, set a start and end point, and watch six different pathfinding algorithms explore in real time. Live stats show nodes visited, path length, time taken, and complexity for each run.
@@ -14,7 +13,6 @@ It started as a way to actually *see* the difference between BFS and A* instead 
 
 <img width="1918" height="1013" alt="inital screenshot" src="https://github.com/user-attachments/assets/a2231f02-303f-4e82-a245-2be4320215bd" />
 <img width="1918" height="977" alt="final screenshot" src="https://github.com/user-attachments/assets/8e3dd516-6709-4347-bb9a-4f37608c0aa7" />
-
 
 ## Algorithms
 
@@ -49,4 +47,4 @@ Each algorithm name links to a writeup in `docs/`: theory, pseudocode, complexit
 
 ## Project Link
 
-<!-- add live deployed link here once GitHub Pages deploy is done -->
+[https://nikhilvirdi.github.io/GridLab/](https://nikhilvirdi.github.io/GridLab/)
