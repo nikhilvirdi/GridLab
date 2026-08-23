@@ -618,7 +618,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   opacity: isAnimating ? 0.3 : 1,
                   fontFamily: 'inherit',
                   fontSize: '14px',
-                  color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : '#888888',
+                  color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : (isDark ? '#888888' : '#000000'),
                 }}
               >
                 <span>{selectedAlgo ? selectedAlgo.name : 'Select Algorithm'}</span>
@@ -686,7 +686,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                           color:
                             selectedAlgo?.id === algo.id
                               ? isDark ? '#ffffff' : '#000000'
-                              : isDark ? '#cccccc' : '#444444',
+                              : isDark ? '#cccccc' : '#000000',
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
@@ -766,7 +766,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                 transition={{ duration: 0.2 }}
                 style={{
                   fontSize: '13px',
-                  color: '#888888',
+                  color: isDark ? '#888888' : '#000000',
                   fontFamily: 'inherit',
                   lineHeight: 1.45,
                   margin: 0,
@@ -796,7 +796,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   width: '100%',
                 }}
               >
-                <span style={{ fontSize: '12px', color: '#888888', flexShrink: 0 }}>S</span>
+                <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>S</span>
                 <input
                   type="range"
                   min={0}
@@ -807,7 +807,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                   className={isDark ? 'speed-slider' : 'speed-slider-light'}
                   style={{ flex: 1 }}
                 />
-                <span style={{ fontSize: '12px', color: '#888888', flexShrink: 0 }}>F</span>
+                <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>F</span>
                 <button
                   onClick={handleStop}
                   style={{
@@ -890,7 +890,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                           <p
                             style={{
                               fontSize: '13px',
-                              color: '#888888',
+                              color: isDark ? '#888888' : '#000000',
                               margin: '0 0 20px 0',
                               lineHeight: 1.5,
                               fontFamily: 'inherit',
@@ -942,7 +942,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 60, theme = 'dark
                               <span
                                 style={{
                                   fontSize: '13px',
-                                  color: '#888888',
+                                  color: isDark ? '#888888' : '#000000',
                                   fontFamily: 'inherit',
                                 }}
                               >
