@@ -18,7 +18,7 @@ function App() {
     >
       {/* Logo — fixed top-left */}
       <img
-        src={isDark ? '/gridlab_logo.png' : '/gridlab_logo_lighttheme.png'}
+        src={isDark ? `${import.meta.env.BASE_URL}gridlab_logo.png` : `${import.meta.env.BASE_URL}gridlab_logo_lighttheme.png`}
         alt="GridLab"
         className="fixed z-50"
         style={{ top: '24px', left: '32px', height: '56px', width: 'auto' }}
