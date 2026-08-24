@@ -11,8 +11,11 @@ GridLab is a mini project I built for my CSE 4th semester Design and Analysis of
 
 It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and grew from there: seven algorithms instead of six, a corridor-based maze generator alongside the original random walls, five terrain biomes with their own movement costs and obstacle types, a diagonal-movement toggle, and a side-by-side comparison mode for running two algorithms on the same grid at once.
 
-<!-- screenshot: a biome (Volcanic or Tundra) with a completed algorithm run -->
-<!-- screenshot: maze mode showing generated corridors -->
+<img width="1918" height="1026" alt="initial daashboard image" src="https://github.com/user-attachments/assets/a81e3c8b-7de9-41ae-9563-5131f706055a" />
+<img width="1918" height="1021" alt="volcano biome" src="https://github.com/user-attachments/assets/75fc231d-34d8-4f8d-a318-2ebde59558b0" />
+<img width="1917" height="1023" alt="maze" src="https://github.com/user-attachments/assets/fa435151-0790-483f-a169-8dcdb497d660" />
+<img width="1917" height="1026" alt="compare mode" src="https://github.com/user-attachments/assets/e8a8e301-7bd9-4cc4-ac19-669a7f845c63" />
+
 <!-- screenshot: comparison mode, two grids + middle stats panel -->
 
 ## Algorithms
