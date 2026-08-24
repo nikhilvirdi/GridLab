@@ -1386,7 +1386,6 @@ interface ModeSnapshot {
                     step={1}
                     value={speed}
                     onChange={(e) => setSpeed(Number(e.target.value))}
-                    className={isDark ? 'speed-slider' : 'speed-slider-light'}
                     style={{ flex: 1 }}
                   />
                   <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>F</span>
