@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoaderOne from '../components/LoaderOne';
-import { generateMaze } from '../algorithms/maze';
+import { generateMaze, generateCorridorMaze } from '../algorithms/maze';
 import { solveBFS } from '../algorithms/bfs';
 import { solveDFS } from '../algorithms/dfs';
 import { solveAStar } from '../algorithms/astar';
@@ -108,8 +108,21 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
 
+interface ModeSnapshot {
+  grid: number[][];
+  startPoint: Point | null;
+  endPoint: Point | null;
+  solveResult: SolveResult | null;
+  showStats: boolean;
+  statsPanelOpen: boolean;
+  noPathFound: boolean;
+  invalidPlacement: boolean;
+}
+
   // Grid state
   const [grid, setGrid]           = useState<number[][]>([]);
+  const [mazeMode, setMazeMode] = useState<'random' | 'corridor'>('random');
+  const [inactiveSnapshot, setInactiveSnapshot] = useState<ModeSnapshot | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: GRID_PX, height: GRID_PX });
@@ -153,9 +166,14 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
     setStartPoint(null);
     setEndPoint(null);
     setRotation(0);
+    setSolveResult(null);
+    setShowStats(false);
+    setStatsPanelOpen(false);
+    setNoPathFound(false);
+    setInvalidPlacement(false);
 
     try {
-      const newGrid = generateMaze(size);
+      const newGrid = mazeMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
       if (active) {
         setGrid(newGrid);
         setLoading(false);
@@ -169,6 +187,71 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
 
     return () => { active = false; };
   }, [size]);
+
+  const switchMazeMode = (targetMode: 'random' | 'corridor') => {
+    if (targetMode === mazeMode || isAnimating) return;
+
+    const currentSnapshot: ModeSnapshot = {
+      grid, startPoint, endPoint, solveResult,
+      showStats, statsPanelOpen, noPathFound, invalidPlacement,
+    };
+
+    if (inactiveSnapshot) {
+      setGrid(inactiveSnapshot.grid);
+      setStartPoint(inactiveSnapshot.startPoint);
+      setEndPoint(inactiveSnapshot.endPoint);
+      setSolveResult(inactiveSnapshot.solveResult);
+      setShowStats(inactiveSnapshot.showStats);
+      setStatsPanelOpen(inactiveSnapshot.statsPanelOpen);
+      setNoPathFound(inactiveSnapshot.noPathFound);
+      setInvalidPlacement(inactiveSnapshot.invalidPlacement);
+      setInactiveSnapshot(currentSnapshot);
+      setMazeMode(targetMode);
+    } else {
+      setInactiveSnapshot(currentSnapshot);
+      setMazeMode(targetMode);
+      setLoading(true);
+      setError(null);
+      setStartPoint(null);
+      setEndPoint(null);
+      setRotation(0);
+      setSolveResult(null);
+      setShowStats(false);
+      setStatsPanelOpen(false);
+      setNoPathFound(false);
+      setInvalidPlacement(false);
+      try {
+        const newGrid = targetMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
+        setGrid(newGrid);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err?.message || 'Maze generation error');
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleReroll = () => {
+    if (isAnimating) return;
+    setLoading(true);
+    setError(null);
+    setStartPoint(null);
+    setEndPoint(null);
+    setRotation(prev => prev + 360);
+    setSolveResult(null);
+    setShowStats(false);
+    setStatsPanelOpen(false);
+    setNoPathFound(false);
+    setInvalidPlacement(false);
+    try {
+      const newGrid = mazeMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
+      setGrid(newGrid);
+      setLoading(false);
+    } catch (err: any) {
+      setError(err?.message || 'Maze generation error');
+      setLoading(false);
+    }
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -492,7 +575,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
         )}
       </AnimatePresence>
 
-      {/* ── Left column — 55%, grid centered flush-right with padding ── */}
+      {/* ── Left column — 55%, grid+controls centered flush-right with padding ── */}
       <div
         style={{
           width: '55%',
@@ -504,35 +587,141 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
           flexShrink: 0,
         }}
       >
-        {/* Grid container */}
         <div
-          ref={containerRef}
           style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
             width: `${GRID_PX}px`,
-            height: `${GRID_PX}px`,
-            boxSizing: 'content-box',
             flexShrink: 0,
-            backgroundColor: isDark ? '#0d0d0d' : '#ffffff',
-            border: `2px solid ${borderColor}`,
-            borderRadius: '4px',
-            overflow: 'hidden',
-            position: 'relative',
-            padding: 0,
-            margin: 0,
           }}
         >
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
+          {/* Grid container — UNCHANGED internals */}
+          <div
+            ref={containerRef}
             style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              margin: 0,
+              width: `${GRID_PX}px`,
+              height: `${GRID_PX}px`,
+              boxSizing: 'content-box',
+              flexShrink: 0,
+              backgroundColor: isDark ? '#0d0d0d' : '#ffffff',
+              border: `2px solid ${borderColor}`,
+              borderRadius: '4px',
+              overflow: 'hidden',
+              position: 'relative',
               padding: 0,
-              cursor: isAnimating ? 'default' : 'crosshair',
+              margin: 0,
             }}
-          />
+          >
+            <canvas
+              ref={canvasRef}
+              onClick={handleCanvasClick}
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '100%',
+                margin: 0,
+                padding: 0,
+                cursor: isAnimating ? 'default' : 'crosshair',
+              }}
+            />
+          </div>
+
+          {/* Bottom control row: mini mode toggle | terrain placeholder | reroll */}
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', width: '100%' }}>
+
+            {/* Compact mode toggle — single button, cycles random/corridor, shows current mode */}
+            <button
+              onClick={() => switchMazeMode(mazeMode === 'random' ? 'corridor' : 'random')}
+              disabled={isAnimating}
+              title="Toggle grid generation mode"
+              aria-label="Toggle grid generation mode"
+              style={{
+                height: '36px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                backgroundColor: panelBg,
+                border: `2px solid ${borderColor}`,
+                color: isDark ? '#ffffff' : '#000000',
+                fontFamily: 'inherit',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                cursor: isAnimating ? 'not-allowed' : 'pointer',
+                opacity: isAnimating ? 0.3 : 1,
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {mazeMode === 'random' ? 'RANDOM' : 'MAZE'}
+            </button>
+
+            {/* Terrain dropdown placeholder — visually present, non-functional, disabled.
+                This is a future feature slot, not wired to anything yet. */}
+            <button
+              disabled
+              title="Terrain — coming soon"
+              style={{
+                flex: 1,
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: panelBg,
+                border: `2px solid ${borderColor}`,
+                color: isDark ? '#555555' : '#999999',
+                fontFamily: 'inherit',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                cursor: 'not-allowed',
+                opacity: 0.4,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              TERRAIN
+            </button>
+
+            {/* Reroll button — regenerates only the active mode's grid */}
+            <button
+              onClick={handleReroll}
+              disabled={isAnimating}
+              title="Reroll Grid"
+              aria-label="Reroll Grid"
+              style={{
+                width: '36px',
+                height: '36px',
+                minWidth: '36px',
+                borderRadius: '8px',
+                backgroundColor: panelBg,
+                border: `2px solid ${borderColor}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: isAnimating ? 'not-allowed' : 'pointer',
+                opacity: isAnimating ? 0.3 : 1,
+                flexShrink: 0,
+                padding: 0,
+              }}
+            >
+              <motion.svg
+                animate={{ rotate: rotation }}
+                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={isDark ? '#ffffff' : '#000000'}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </motion.svg>
+            </button>
+          </div>
         </div>
       </div>
 
