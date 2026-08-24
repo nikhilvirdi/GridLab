@@ -9,7 +9,7 @@ import { solveJPS } from '../algorithms/jps';
 import { solveThetaStar } from '../algorithms/theta';
 import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
 import { solveGreedy } from '../algorithms/greedy';
-import { BIOME_LIST, BIOME_MAP, type BiomeId } from '../algorithms/biomes';
+import { BIOME_LIST, BIOME_MAP, getMarkerColors, type BiomeId } from '../algorithms/biomes';
 
 interface Point {
   r: number;
@@ -94,7 +94,7 @@ const ALGORITHMS: AlgorithmOption[] = [
   }
 ];
 
-const SPEED_DELAY = [50, 20, 5];
+const SPEED_DELAY = [80, 45, 20, 10, 4];
 const PATH_DELAY = 30;
 
 const ALGO_COMPLEXITY: Record<string, string> = {
@@ -129,11 +129,26 @@ const generateGridForMode = (
     case 'noise':
       return generateClusteredTerrain(gridSize, config.density ?? 0.1, 0);
     case 'clustered':
-      return generateClusteredTerrain(gridSize, config.density ?? 0.3, config.iterations ?? 3);
+      return generateClusteredTerrain(gridSize, config.density ?? 0.3, config.iterations ?? 3, config.scatterDensity ?? 0, config.scatterRadius ?? 0);
     case 'river':
-      return generateRiverTerrain(gridSize, config.riverCount ?? 3, config.riverWidth ?? 3);
+      return generateRiverTerrain(
+        gridSize,
+        config.pondCountMin ?? 4, config.pondCountMax ?? 6,
+        config.pondSizeMin ?? 7, config.pondSizeMax ?? 8,
+        config.riverCountMin ?? 6, config.riverCountMax ?? 10,
+        config.riverWidthMin ?? 2, config.riverWidthMax ?? 3,
+        config.riverLengthMin ?? 7, config.riverLengthMax ?? 15,
+        config.singleBlockDensity ?? 0.04
+      );
     case 'glacier':
-      return generateGlacierTerrain(gridSize, config.blobCount ?? 8, config.blobMinSize ?? 60, config.blobMaxSize ?? 180);
+      return generateGlacierTerrain(
+        gridSize,
+        config.blobCountMin ?? 10,
+        config.blobCountMax ?? 15,
+        config.blobMinSize ?? 15,
+        config.blobMaxSize ?? 50,
+        config.scatterDensity ?? 0.08
+      );
     default:
       return generateClusteredTerrain(gridSize, 0.3, 3);
   }
@@ -147,6 +162,7 @@ export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark
   const dropdownRef   = useRef<HTMLDivElement>(null);
   const biomeDropdownRef = useRef<HTMLDivElement>(null);
   const animStopRef   = useRef(false);
+  const stoppedEarlyRef = useRef(false);
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
 
@@ -186,7 +202,7 @@ interface ModeSnapshot {
   const [isAnimating, setIsAnimating] = useState(false);
   const [noPathFound, setNoPathFound] = useState(false);
   const [invalidPlacement, setInvalidPlacement] = useState(false);
-  const [speed, setSpeed]             = useState(1);
+  const [speed, setSpeed]             = useState(2);
   const [solveResult, setSolveResult] = useState<SolveResult | null>(null);
   const [showStats, setShowStats]         = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
@@ -198,10 +214,21 @@ interface ModeSnapshot {
   const dimensionsRef = useRef(dimensions);
   const speedRef = useRef(speed);
   const themeRef = useRef(theme);
+  const gridLineColorRef = useRef<string>('#1a1a1a');
 
   useEffect(() => { dimensionsRef.current = dimensions; }, [dimensions]);
   useEffect(() => { speedRef.current = speed; }, [speed]);
   useEffect(() => { themeRef.current = theme; }, [theme]);
+  useEffect(() => {
+    // Mirrors the exact same conditional logic drawBaseGrid already uses
+    // for its grid-line stroke, so paintCell's per-cell borders (used
+    // during animation for visited/path/start/end cells) stay visually
+    // consistent with the base grid instead of always using near-black.
+    gridLineColorRef.current =
+      theme === 'dark'
+        ? (activeBiome === 'classic' ? '#1a1a1a' : 'rgba(128,128,128,0.15)')
+        : 'rgba(0,0,0,0.08)';
+  }, [theme, activeBiome]);
 
   // Theta* requires 8-directional movement; JPS only supports 4-directional
   // movement — auto-adjust diagonal mode whenever the selected algorithm
@@ -317,6 +344,11 @@ interface ModeSnapshot {
   const handleBiomeChange = (biome: BiomeId) => {
     if (biome === activeBiome || isAnimating) return;
     setActiveBiome(biome);
+    setLoading(true);
+    setError(null);
+    setStartPoint(null);
+    setEndPoint(null);
+    setRotation((prev) => prev + 360);
     setSolveResult(null);
     setShowStats(false);
     setStatsPanelOpen(false);
@@ -331,10 +363,21 @@ interface ModeSnapshot {
             statsPanelOpen: false,
             noPathFound: false,
             invalidPlacement: false,
-          }
-        : prev
-    );
-  };
+            }
+          : prev
+      );
+      try {
+        // Use the newly-selected `biome` parameter directly, not the
+        // activeBiome state — the setActiveBiome call above hasn't taken
+        // effect yet within this same function execution.
+        const newGrid = generateGridForMode(mazeMode, size, biome);
+        setGrid(newGrid);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err?.message || 'Maze generation error');
+        setLoading(false);
+      }
+    };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -414,7 +457,7 @@ interface ModeSnapshot {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = color;
     ctx.fillRect(x1, y1, w, w);
-    ctx.strokeStyle = themeRef.current === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.08)';
+    ctx.strokeStyle = gridLineColorRef.current;
     ctx.lineWidth = 1;
     ctx.strokeRect(x1, y1, w, w);
     ctx.restore();
@@ -451,7 +494,7 @@ interface ModeSnapshot {
       const isEnd   = row === end.r   && col === end.c;
 
       if (!isStart && !isEnd) {
-        paintCell(row, col, '#1a7fd4');
+        paintCell(row, col, markerColors.visited);
       }
 
       const visitDelay = SPEED_DELAY[speedRef.current];
@@ -465,8 +508,8 @@ interface ModeSnapshot {
         return;
       }
       if (i >= data.path.length) {
-        paintCell(start.r, start.c, '#00e676');
-        paintCell(end.r,   end.c,   '#ff1744');
+        paintCell(start.r, start.c, markerColors.start);
+        paintCell(end.r,   end.c,   markerColors.end);
         isAnimatingRef.current = false;
         setIsAnimating(false);
         setShowStats(true);
@@ -478,7 +521,7 @@ interface ModeSnapshot {
       const isEnd   = row === end.r   && col === end.c;
 
       if (!isStart && !isEnd) {
-        paintCell(row, col, '#f5c518');
+        paintCell(row, col, markerColors.path);
       }
 
       setTimeout(() => animatePath(i + 1), PATH_DELAY);
@@ -490,6 +533,7 @@ interface ModeSnapshot {
   const handleStop = () => {
     animStopRef.current = true;
     isAnimatingRef.current = false;
+    stoppedEarlyRef.current = true;
     setIsAnimating(false);
   };
 
@@ -499,6 +543,7 @@ interface ModeSnapshot {
     const solver = ALGO_SOLVERS[selectedAlgo.id];
     if (!solver) return;
 
+    stoppedEarlyRef.current = false;
     setIsFetching(true);
     setNoPathFound(false);
     setInvalidPlacement(false);
@@ -567,7 +612,12 @@ interface ModeSnapshot {
       return;
     }
 
-    const biomeConfig = BIOME_MAP[activeBiome];
+    // Biome colors only apply in Random mode — Maze/corridor mode always
+    // renders with Classic colors regardless of the selected biome, since
+    // themed terrain (rivers, glaciers, lava, etc.) doesn't make sense on
+    // structured maze corridors. The biome selection itself is untouched;
+    // this only affects which colors get rendered.
+    const biomeConfig = mazeMode === 'corridor' ? BIOME_MAP.classic : BIOME_MAP[activeBiome];
     const wallColor = theme === 'dark' ? biomeConfig.wallDark : biomeConfig.wallLight;
     const openColor = theme === 'dark' ? biomeConfig.openDark : biomeConfig.openLight;
 
@@ -575,9 +625,9 @@ interface ModeSnapshot {
       for (let c = 0; c < size; c++) {
         const isWall = !loading && grid.length > 0 && grid[r]?.[c] === 1;
         if (startPoint && startPoint.r === r && startPoint.c === c) {
-          ctx.fillStyle = '#00e676';
+          ctx.fillStyle = markerColors.start;
         } else if (endPoint && endPoint.r === r && endPoint.c === c) {
-          ctx.fillStyle = '#ff1744';
+          ctx.fillStyle = markerColors.end;
         } else {
           ctx.fillStyle = isWall ? wallColor : openColor;
         }
@@ -589,7 +639,10 @@ interface ModeSnapshot {
       }
     }
 
-    ctx.strokeStyle = theme === 'dark' ? '#1a1a1a' : 'rgba(0,0,0,0.08)';
+    ctx.strokeStyle =
+      theme === 'dark'
+        ? (activeBiome === 'classic' ? '#1a1a1a' : 'rgba(128,128,128,0.15)')
+        : 'rgba(0,0,0,0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i <= size; i++) {
@@ -618,34 +671,47 @@ interface ModeSnapshot {
         const isStart = pt.row === startPoint?.r && pt.col === startPoint?.c;
         const isEnd   = pt.row === endPoint?.r   && pt.col === endPoint?.c;
         if (!isStart && !isEnd) {
-          paintCell(pt.row, pt.col, '#1a7fd4');
+          paintCell(pt.row, pt.col, markerColors.visited);
         }
       }
       for (const pt of solveResult.path) {
         const isStart = pt.row === startPoint?.r && pt.col === startPoint?.c;
         const isEnd   = pt.row === endPoint?.r   && pt.col === endPoint?.c;
         if (!isStart && !isEnd) {
-          paintCell(pt.row, pt.col, '#f5c518');
+          paintCell(pt.row, pt.col, markerColors.path);
         }
       }
-      if (startPoint) paintCell(startPoint.r, startPoint.c, '#00e676');
-      if (endPoint) paintCell(endPoint.r, endPoint.c, '#ff1744');
+      if (startPoint) paintCell(startPoint.r, startPoint.c, markerColors.start);
+      if (endPoint) paintCell(endPoint.r, endPoint.c, markerColors.end);
     }
   };
 
   useEffect(() => {
     if (isAnimating) return;
+    if (stoppedEarlyRef.current) {
+      // The animation was interrupted by the Stop button, not completed or
+      // switched away from — preserve the canvas exactly as it currently
+      // is instead of jumping to the full completed result. This flag is a
+      // one-shot: it's consumed here and reset, so any LATER trigger of
+      // this effect (theme switch, biome switch, etc.) behaves normally.
+      stoppedEarlyRef.current = false;
+      return;
+    }
     if (solveResult) {
       redrawCurrentState();
     } else {
       drawBaseGrid();
     }
-  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme, activeBiome]);
+  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme, activeBiome, mazeMode]);
 
   // ─── Styling tokens ───────────────────────────────────────────────────────
   const borderColor  = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
   const panelBg      = isDark ? '#111111' : '#e0e0e0';
   const valueBoxBg   = isDark ? '#1a1a1a' : '#d8d8d8';
+  // Marker colors follow the same "Maze mode forces Classic" rule already
+  // used for wall/open colors — biome marker overrides only apply in
+  // Random mode with a non-classic biome active.
+  const markerColors = getMarkerColors(mazeMode === 'corridor' ? BIOME_MAP.classic : BIOME_MAP[activeBiome]);
 
   const CONTENT_W   = 420;
   const CTRL_H      = 48;
@@ -788,8 +854,8 @@ interface ModeSnapshot {
             <div ref={biomeDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
               <button
                 onClick={() => setIsBiomeDropdownOpen((prev) => !prev)}
-                disabled={isAnimating}
-                title="Select terrain biome"
+                disabled={isAnimating || mazeMode === 'corridor'}
+                title={mazeMode === 'corridor' ? 'Biomes only apply in Random mode' : 'Select terrain biome'}
                 aria-label="Select terrain biome"
                 style={{
                   width: '100%',
@@ -802,8 +868,8 @@ interface ModeSnapshot {
                   fontSize: '12px',
                   fontWeight: 700,
                   letterSpacing: '0.05em',
-                  cursor: isAnimating ? 'not-allowed' : 'pointer',
-                  opacity: isAnimating ? 0.3 : 1,
+                  cursor: (isAnimating || mazeMode === 'corridor') ? 'not-allowed' : 'pointer',
+                  opacity: (isAnimating || mazeMode === 'corridor') ? 0.3 : 1,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -811,7 +877,7 @@ interface ModeSnapshot {
                   whiteSpace: 'nowrap',
                 }}
               >
-                <span>{BIOME_MAP[activeBiome].label}</span>
+                <span>{mazeMode === 'corridor' ? 'CLASSIC' : BIOME_MAP[activeBiome].label}</span>
                 <svg
                   width="12"
                   height="12"
@@ -830,27 +896,27 @@ interface ModeSnapshot {
                 </svg>
               </button>
 
-              {/* Biome list — opens upward since this row sits near the bottom of the grid */}
+              {/* Biome list — opens downward, scrollable, shows ~2 items at a time */}
               <AnimatePresence>
                 {isBiomeDropdownOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
+                    exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15, ease: 'easeOut' }}
                     className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
                     style={{
                       position: 'absolute',
-                      bottom: '100%',
-                      marginBottom: '8px',
+                      top: '100%',
+                      marginTop: '8px',
                       left: 0,
                       width: '180px',
-                      maxHeight: '220px',
+                      maxHeight: '80px',
                       overflowY: 'auto',
                       borderRadius: '10px',
                       backgroundColor: panelBg,
                       border: `2px solid ${borderColor}`,
-                      boxShadow: isDark ? '0 -10px 30px rgba(0,0,0,0.6)' : '0 -10px 30px rgba(0,0,0,0.1)',
+                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
                       zIndex: 100,
                     }}
                   >
@@ -1197,7 +1263,7 @@ interface ModeSnapshot {
                 <input
                   type="range"
                   min={0}
-                  max={2}
+                  max={4}
                   step={1}
                   value={speed}
                   onChange={(e) => setSpeed(Number(e.target.value))}

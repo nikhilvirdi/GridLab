@@ -113,7 +113,10 @@ export function generateCorridorMaze(N: number): number[][] {
  * Returns a 2D array where 0 = open cell and 1 = obstacle cell, matching
  * the same format as generateMaze and generateCorridorMaze.
  */
-export function generateClusteredTerrain(N: number, density: number, iterations: number): number[][] {
+export function generateClusteredTerrain(
+  N: number, density: number, iterations: number,
+  scatterDensity: number = 0, scatterRadius: number = 0
+): number[][] {
   if (N <= 0) return [];
 
   let grid: number[][] = Array.from({ length: N }, () =>
@@ -126,11 +129,15 @@ export function generateClusteredTerrain(N: number, density: number, iterations:
       for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
         const nr = r + dr, nc = c + dc;
-        if (nr < 0 || nr >= N || nc < 0 || nc >= N) {
-          count++; // treat out-of-bounds as obstacle — keeps clusters from bleeding oddly at edges
-        } else if (g[nr][nc] === 1) {
-          count++;
-        }
+        // Out-of-bounds neighbors are simply skipped rather than counted
+        // as obstacles. Counting them as obstacles artificially inflates
+        // neighbor counts near the grid edges, which biases the survival
+        // threshold and causes the interior to die out over multiple
+        // iterations while a ring of obstacles survives only along the
+        // border. Skipping keeps the rule spatially uniform across the
+        // whole grid.
+        if (nr < 0 || nr >= N || nc < 0 || nc >= N) continue;
+        if (g[nr][nc] === 1) count++;
       }
     }
     return count;
@@ -140,10 +147,54 @@ export function generateClusteredTerrain(N: number, density: number, iterations:
     const next: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
     for (let r = 0; r < N; r++) {
       for (let c = 0; c < N; c++) {
-        next[r][c] = countObstacleNeighbors(grid, r, c) >= 5 ? 1 : 0;
+        // Threshold of 4 (rather than 5) out of up to 8 neighbors is a
+        // standard, well-tested cave-generation survival rule — stable
+        // enough to sustain organic clusters across multiple smoothing
+        // passes without the whole grid decaying toward empty, while
+        // still smoothing scattered noise into coherent blobs.
+        next[r][c] = countObstacleNeighbors(grid, r, c) >= 4 ? 1 : 0;
       }
     }
     grid = next;
+  }
+
+  // Optional second pass: scatter additional single-cell obstacles on
+  // top of the clustered terrain. When scatterRadius is 0 (default),
+  // scatter applies uniformly across all open cells — this is the
+  // original behavior, unchanged for any existing caller (e.g. Swamp).
+  // When scatterRadius > 0, scatter is restricted to open cells within
+  // that radius of an EXISTING obstacle cell — producing spatter/debris
+  // clustered near the main obstacle masses (e.g. lava embers near
+  // pools) rather than scattered randomly across the whole grid.
+  if (scatterDensity > 0) {
+    if (scatterRadius > 0) {
+      const isNearObstacle = (r: number, c: number): boolean => {
+        for (let dr = -scatterRadius; dr <= scatterRadius; dr++) {
+          for (let dc = -scatterRadius; dc <= scatterRadius; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < N && nc >= 0 && nc < N && grid[nr][nc] === 1) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (grid[r][c] === 0 && isNearObstacle(r, c) && Math.random() < scatterDensity) {
+            grid[r][c] = 1;
+          }
+        }
+      }
+    } else {
+      for (let r = 0; r < N; r++) {
+        for (let c = 0; c < N; c++) {
+          if (grid[r][c] === 0 && Math.random() < scatterDensity) {
+            grid[r][c] = 1;
+          }
+        }
+      }
+    }
   }
 
   return grid;
@@ -159,20 +210,90 @@ export function generateClusteredTerrain(N: number, density: number, iterations:
  *
  * Returns a 2D array where 0 = open land and 1 = water (obstacle).
  */
-export function generateRiverTerrain(N: number, riverCount: number, width: number): number[][] {
+export function generateRiverTerrain(
+  N: number,
+  pondCountMin: number, pondCountMax: number, pondSizeMin: number, pondSizeMax: number,
+  riverCountMin: number, riverCountMax: number, riverWidthMin: number, riverWidthMax: number,
+  riverLengthMin: number, riverLengthMax: number,
+  singleBlockDensity: number
+): number[][] {
   if (N <= 0) return [];
 
   const grid: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
-  const halfWidth = Math.floor(width / 2);
+  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
+  // Pass 1: small round ponds via flood-fill growth from a random seed —
+  // round shape is fine and natural-looking for a small pond.
+  const pondCount = pondCountMin + Math.floor(Math.random() * (pondCountMax - pondCountMin + 1));
+  for (let p = 0; p < pondCount; p++) {
+    const size = pondSizeMin + Math.floor(Math.random() * (pondSizeMax - pondSizeMin + 1));
+    const startR = Math.floor(Math.random() * N);
+    const startC = Math.floor(Math.random() * N);
+    const visited = new Set<string>([`${startR},${startC}`]);
+    grid[startR][startC] = 1;
+    const frontier: [number, number][] = [[startR, startC]];
+    let count = 1;
+    let attempts = 0;
+    const maxAttempts = size * 30;
+    while (count < size && frontier.length > 0 && attempts < maxAttempts) {
+      attempts++;
+      const idx = Math.floor(Math.random() * frontier.length);
+      const [r, c] = frontier[idx];
+      const [dr, dc] = DIRS[Math.floor(Math.random() * DIRS.length)];
+      const nr = r + dr, nc = c + dc;
+      const key = `${nr},${nc}`;
+      if (nr >= 0 && nr < N && nc >= 0 && nc < N && !visited.has(key)) {
+        visited.add(key);
+        grid[nr][nc] = 1;
+        frontier.push([nr, nc]);
+        count++;
+      }
+    }
+  }
+
+  // Pass 2: short thin rivers/streams, distinct from ponds — narrow
+  // (2-3 wide), short (7-15 long), random orientation, gentle wander.
+  const riverCount = riverCountMin + Math.floor(Math.random() * (riverCountMax - riverCountMin + 1));
   for (let i = 0; i < riverCount; i++) {
-    let col = Math.floor(Math.random() * N);
-    for (let row = 0; row < N; row++) {
-      col += Math.floor(Math.random() * 3) - 1; // drift -1, 0, or +1
-      col = Math.max(0, Math.min(N - 1, col));
-      for (let dc = -halfWidth; dc <= halfWidth; dc++) {
-        const c = col + dc;
-        if (c >= 0 && c < N) grid[row][c] = 1;
+    const width = riverWidthMin + Math.floor(Math.random() * (riverWidthMax - riverWidthMin + 1));
+    const length = riverLengthMin + Math.floor(Math.random() * (riverLengthMax - riverLengthMin + 1));
+    const isVertical = Math.random() < 0.5;
+    const widthStartOffset = -Math.floor((width - 1) / 2);
+    let currentDelta = 0;
+
+    if (isVertical) {
+      const startRow = Math.floor(Math.random() * Math.max(1, N - length));
+      let col = Math.floor(Math.random() * N);
+      for (let step = 0; step < length; step++) {
+        const row = startRow + step;
+        if (Math.random() < 0.4) currentDelta = Math.floor(Math.random() * 3) - 1;
+        col = Math.max(0, Math.min(N - 1, col + currentDelta));
+        for (let dw = 0; dw < width; dw++) {
+          const c = col + widthStartOffset + dw;
+          if (c >= 0 && c < N && row >= 0 && row < N) grid[row][c] = 1;
+        }
+      }
+    } else {
+      const startCol = Math.floor(Math.random() * Math.max(1, N - length));
+      let row = Math.floor(Math.random() * N);
+      for (let step = 0; step < length; step++) {
+        const col = startCol + step;
+        if (Math.random() < 0.4) currentDelta = Math.floor(Math.random() * 3) - 1;
+        row = Math.max(0, Math.min(N - 1, row + currentDelta));
+        for (let dw = 0; dw < width; dw++) {
+          const r = row + widthStartOffset + dw;
+          if (r >= 0 && r < N && col >= 0 && col < N) grid[r][col] = 1;
+        }
+      }
+    }
+  }
+
+  // Pass 3: scattered single-cell water drops on whatever ground is
+  // still open, adding fine-grained decision points throughout.
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      if (grid[r][c] === 0 && Math.random() < singleBlockDensity) {
+        grid[r][c] = 1;
       }
     }
   }
@@ -193,12 +314,15 @@ export function generateRiverTerrain(N: number, riverCount: number, width: numbe
  * Returns a 2D array where 0 = open ground and 1 = glacier (obstacle).
  */
 export function generateGlacierTerrain(
-  N: number, blobCount: number, blobMinSize: number, blobMaxSize: number
+  N: number, blobCountMin: number, blobCountMax: number, blobMinSize: number, blobMaxSize: number,
+  scatterDensity: number
 ): number[][] {
   if (N <= 0) return [];
 
   const grid: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
   const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  const blobCount = blobCountMin + Math.floor(Math.random() * (blobCountMax - blobCountMin + 1));
 
   for (let b = 0; b < blobCount; b++) {
     const targetSize = blobMinSize + Math.floor(Math.random() * (blobMaxSize - blobMinSize + 1));
@@ -210,16 +334,28 @@ export function generateGlacierTerrain(
     const frontier: [number, number][] = [[startR, startC]];
     let count = 1;
 
-    // Safety cap prevents an unlucky frontier (fully boxed-in) from
-    // looping forever without reaching targetSize.
+    // Directional momentum: growth strongly prefers continuing in the
+    // same direction as the previous successful step, producing long
+    // winding ridge/ice-shelf shapes instead of round compact blobs.
+    // Round blobs are easy to skirt around regardless of how many exist;
+    // elongated ridges force real detours since a path can't simply step
+    // past one edge the way it can with a compact island.
+    let momentumDir = DIRS[Math.floor(Math.random() * DIRS.length)];
+
     let attempts = 0;
-    const maxAttempts = targetSize * 30;
+    const maxAttempts = targetSize * 40;
 
     while (count < targetSize && frontier.length > 0 && attempts < maxAttempts) {
       attempts++;
       const idx = Math.floor(Math.random() * frontier.length);
       const [r, c] = frontier[idx];
-      const [dr, dc] = DIRS[Math.floor(Math.random() * DIRS.length)];
+
+      let [dr, dc] = momentumDir;
+      if (Math.random() < 0.3) {
+        [dr, dc] = DIRS[Math.floor(Math.random() * DIRS.length)];
+        momentumDir = [dr, dc];
+      }
+
       const nr = r + dr, nc = c + dc;
       const key = `${nr},${nc}`;
 
@@ -228,6 +364,24 @@ export function generateGlacierTerrain(
         grid[nr][nc] = 1;
         frontier.push([nr, nc]);
         count++;
+      } else {
+        // Blocked, out of bounds, or already visited in the current
+        // direction — pick a fresh random momentum direction so growth
+        // doesn't stall permanently against an edge or itself.
+        momentumDir = DIRS[Math.floor(Math.random() * DIRS.length)];
+      }
+    }
+  }
+
+  // Second pass: scatter individual single-cell ice blockers across
+  // remaining open cells, on top of the large glacier clusters —
+  // mirroring how real tundra has loose ice chunks in addition to big
+  // glaciers, and forcing genuine decisions in the open areas between
+  // glacier masses instead of leaving them fully clear.
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      if (grid[r][c] === 0 && Math.random() < scatterDensity) {
+        grid[r][c] = 1;
       }
     }
   }
