@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Eraser } from 'lucide-react';
 import LoaderOne from '../components/LoaderOne';
 import { generateMaze, generateCorridorMaze, generateClusteredTerrain, generateRiverTerrain, generateGlacierTerrain } from '../algorithms/maze';
 import { solveBFS } from '../algorithms/bfs';
@@ -29,9 +30,26 @@ interface SolveResult {
   timeTaken: number;
 }
 
+export interface GridCanvasHandle {
+  run: () => void;
+  clear: () => void;
+  reroll: () => void;
+}
+
 interface GridCanvasProps {
   size?: number;
   theme?: 'dark' | 'light';
+  compareMode?: boolean;
+  externalGrid?: number[][];
+  externalStartPoint?: Point | null;
+  externalEndPoint?: Point | null;
+  onGridGenerated?: (grid: number[][]) => void;
+  onStartPointChange?: (pt: Point | null) => void;
+  onEndPointChange?: (pt: Point | null) => void;
+  externalSpeed?: number;
+  onSolveResultChange?: (result: SolveResult | null, complexity: string | null) => void;
+  onSelectedAlgoChange?: (algoName: string | null) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
 interface AlgorithmOption {
@@ -156,7 +174,21 @@ const generateGridForMode = (
 
 const GRID_PX = 480;
 
-export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark' }) => {
+export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function GridCanvas({
+  size = 50,
+  theme = 'dark',
+  compareMode = false,
+  externalGrid,
+  externalStartPoint,
+  externalEndPoint,
+  onGridGenerated,
+  onStartPointChange,
+  onEndPointChange,
+  externalSpeed,
+  onSolveResultChange,
+  onSelectedAlgoChange,
+  onBusyChange,
+}, ref) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -217,7 +249,9 @@ interface ModeSnapshot {
   const gridLineColorRef = useRef<string>('#1a1a1a');
 
   useEffect(() => { dimensionsRef.current = dimensions; }, [dimensions]);
-  useEffect(() => { speedRef.current = speed; }, [speed]);
+  useEffect(() => {
+    speedRef.current = (compareMode && externalSpeed !== undefined) ? externalSpeed : speed;
+  }, [speed, externalSpeed, compareMode]);
   useEffect(() => { themeRef.current = theme; }, [theme]);
   useEffect(() => {
     // Mirrors the exact same conditional logic drawBaseGrid already uses
@@ -241,6 +275,48 @@ interface ModeSnapshot {
     }
   }, [selectedAlgo]);
 
+  // Follower sync: adopt externalGrid, externalStartPoint, externalEndPoint when provided in compareMode
+  useEffect(() => {
+    if (compareMode && externalGrid && externalGrid.length > 0) {
+      setGrid(externalGrid);
+      setLoading(false);
+    }
+  }, [externalGrid, compareMode]);
+
+  useEffect(() => {
+    if (compareMode && externalStartPoint !== undefined) {
+      setStartPoint(externalStartPoint);
+    }
+  }, [externalStartPoint, compareMode]);
+
+  useEffect(() => {
+    if (compareMode && externalEndPoint !== undefined) {
+      setEndPoint(externalEndPoint);
+    }
+  }, [externalEndPoint, compareMode]);
+
+  // Report selectedAlgo, solveResult, and busy state upward (compareMode only)
+  useEffect(() => {
+    if (compareMode && onSelectedAlgoChange) {
+      onSelectedAlgoChange(selectedAlgo?.name ?? null);
+    }
+  }, [selectedAlgo, compareMode]);
+
+  useEffect(() => {
+    if (compareMode && onSolveResultChange && !isAnimating) {
+      const complexity = solveResult && selectedAlgo
+        ? ALGO_COMPLEXITY[selectedAlgo.id] ?? null
+        : null;
+      onSolveResultChange(solveResult, complexity);
+    }
+  }, [solveResult, isAnimating, compareMode]);
+
+  useEffect(() => {
+    if (compareMode && onBusyChange) {
+      onBusyChange(isFetching || isAnimating);
+    }
+  }, [isFetching, isAnimating, compareMode]);
+
   // Fetch grid
   useEffect(() => {
     let active = true;
@@ -259,6 +335,7 @@ interface ModeSnapshot {
       const newGrid = generateGridForMode(mazeMode, size, activeBiome);
       if (active) {
         setGrid(newGrid);
+        if (compareMode && onGridGenerated) onGridGenerated(newGrid);
         setLoading(false);
       }
     } catch (err: any) {
@@ -306,6 +383,7 @@ interface ModeSnapshot {
       try {
         const newGrid = generateGridForMode(targetMode, size, activeBiome);
         setGrid(newGrid);
+        if (compareMode && onGridGenerated) onGridGenerated(newGrid);
         setLoading(false);
       } catch (err: any) {
         setError(err?.message || 'Maze generation error');
@@ -329,6 +407,7 @@ interface ModeSnapshot {
     try {
       const newGrid = generateGridForMode(mazeMode, size, activeBiome);
       setGrid(newGrid);
+      if (compareMode && onGridGenerated) onGridGenerated(newGrid);
       setLoading(false);
     } catch (err: any) {
       setError(err?.message || 'Maze generation error');
@@ -372,6 +451,7 @@ interface ModeSnapshot {
         // effect yet within this same function execution.
         const newGrid = generateGridForMode(mazeMode, size, biome);
         setGrid(newGrid);
+        if (compareMode && onGridGenerated) onGridGenerated(newGrid);
         setLoading(false);
       } catch (err: any) {
         setError(err?.message || 'Maze generation error');
@@ -418,10 +498,14 @@ interface ModeSnapshot {
     if (r < 0 || r >= size || c < 0 || c >= size) return;
     if (grid[r]?.[c] === 1) return;
     if (!startPoint) {
-      setStartPoint({ r, c });
+      const pt = { r, c };
+      setStartPoint(pt);
+      if (compareMode && onStartPointChange) onStartPointChange(pt);
     } else if (!endPoint) {
       if (startPoint.r === r && startPoint.c === c) return;
-      setEndPoint({ r, c });
+      const pt = { r, c };
+      setEndPoint(pt);
+      if (compareMode && onEndPointChange) onEndPointChange(pt);
     }
   };
 
@@ -580,6 +664,13 @@ interface ModeSnapshot {
     }
   };
 
+  // Imperative handle — exposes run/clear/reroll to parent via ref (placed after all three handlers are declared)
+  useImperativeHandle(ref, () => ({
+    run: () => { handleRun(); },
+    clear: () => { handleReset(); },
+    reroll: () => { handleReroll(); },
+  }), [handleRun, handleReset, handleReroll]);
+
   // Draw base grid
   const drawBaseGrid = () => {
     if (isAnimatingRef.current) return;
@@ -717,10 +808,134 @@ interface ModeSnapshot {
   const CTRL_H      = 48;
   const SECTION_GAP = 20;
 
+  // Algorithm dropdown element — rendered in top controls in normal mode, or in bottom footer in compare mode
+  const algorithmDropdownEl = (
+    <div ref={dropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <button
+        onClick={() => setIsDropdownOpen((prev) => !prev)}
+        disabled={isAnimating}
+        style={{
+          width: '100%',
+          height: `${CTRL_H}px`,
+          borderRadius: '10px',
+          backgroundColor: panelBg,
+          border: `2px solid ${borderColor}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          cursor: isAnimating ? 'not-allowed' : 'pointer',
+          opacity: isAnimating ? 0.3 : 1,
+          fontFamily: 'inherit',
+          fontSize: '14px',
+          color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : (isDark ? '#888888' : '#000000'),
+        }}
+      >
+        <span>{selectedAlgo ? selectedAlgo.name : 'Select Algorithm'}</span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={isDark ? '#ffffff' : '#000000'}
+          strokeWidth="2"
+          style={{
+            flexShrink: 0,
+            transform: isDropdownOpen ? 'rotate(180deg)' : 'none',
+            transition: 'transform 0.2s',
+          }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {/* Dropdown menu — opens downward */}
+      <AnimatePresence>
+        {isDropdownOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            style={{
+              position: 'absolute',
+              top: '100%',
+              marginTop: '8px',
+              left: 0,
+              width: '100%',
+              maxHeight: '83px',
+              boxSizing: 'border-box',
+              overflow: 'hidden',
+              borderRadius: '10px',
+              backgroundColor: panelBg,
+              border: `2px solid ${borderColor}`,
+              boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
+              zIndex: 100,
+            }}
+          >
+            {/* Inner scroll wrapper — separates scrolling from border-radius container; shows ~2 items */}
+            <div
+              className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
+              style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '79px' }}
+            >
+              {ALGORITHMS.map((algo, idx) => (
+                <button
+                  key={algo.id}
+                  onClick={() => {
+                    setSelectedAlgo(algo);
+                    setIsDropdownOpen(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 16px',
+                    backgroundColor: panelBg,
+                    border: 'none',
+                    borderBottom:
+                      idx < ALGORITHMS.length - 1
+                        ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                        : 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    color:
+                      selectedAlgo?.id === algo.id
+                        ? isDark ? '#ffffff' : '#000000'
+                        : isDark ? '#cccccc' : '#000000',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = panelBg;
+                  }}
+                >
+                  <span>{algo.name}</span>
+                  <span
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      color: algo.badgeColor,
+                    }}
+                  >
+                    {algo.tag}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
   return (
     <div
       className="flex flex-row select-none"
-      style={{ width: '100%', height: '100%' }}
+      style={{ width: compareMode ? 'auto' : '100%', height: '100%' }}
     >
       {/* Fullscreen loader */}
       <AnimatePresence>
@@ -737,15 +952,15 @@ interface ModeSnapshot {
         )}
       </AnimatePresence>
 
-      {/* ── Left column — 55%, grid+controls centered flush-right with padding ── */}
+      {/* ── Left column — 55%, grid+controls centered flush-right with padding (auto in compareMode) ── */}
       <div
         style={{
-          width: '55%',
+          width: compareMode ? 'auto' : '55%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          paddingRight: '52px',
+          justifyContent: compareMode ? 'center' : 'flex-end',
+          paddingRight: compareMode ? 0 : '52px',
           flexShrink: 0,
         }}
       >
@@ -756,6 +971,7 @@ interface ModeSnapshot {
             gap: '12px',
             width: `${GRID_PX}px`,
             flexShrink: 0,
+            paddingBottom: compareMode ? '45px' : 0,
           }}
         >
           {/* Grid container — UNCHANGED internals */}
@@ -790,76 +1006,18 @@ interface ModeSnapshot {
           </div>
 
           {/* Bottom control row: mini mode toggle | terrain placeholder | reroll */}
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', width: '100%' }}>
+          {!compareMode && (
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', width: '100%' }}>
 
-            {/* Compact mode toggle — single button, cycles random/corridor, shows current mode */}
-            <button
-              onClick={() => switchMazeMode(mazeMode === 'random' ? 'corridor' : 'random')}
-              disabled={isAnimating}
-              title="Toggle grid generation mode"
-              aria-label="Toggle grid generation mode"
-              style={{
-                height: '36px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                backgroundColor: panelBg,
-                border: `2px solid ${borderColor}`,
-                color: isDark ? '#ffffff' : '#000000',
-                fontFamily: 'inherit',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-                cursor: isAnimating ? 'not-allowed' : 'pointer',
-                opacity: isAnimating ? 0.3 : 1,
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {mazeMode === 'random' ? 'RANDOM' : 'MAZE'}
-            </button>
-
-            {/* Diagonal movement toggle — locked ON while Theta* is selected, locked OFF while JPS is selected */}
-            <button
-              onClick={() => setAllowDiagonal((prev) => !prev)}
-              disabled={isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps'}
-              title={
-                selectedAlgo?.id === 'theta'
-                  ? 'Theta* requires 8-directional movement'
-                  : selectedAlgo?.id === 'jps'
-                  ? 'JPS only supports 4-directional movement'
-                  : 'Toggle 4-directional / 8-directional movement'
-              }
-              aria-label="Toggle diagonal movement"
-              style={{
-                height: '36px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                backgroundColor: panelBg,
-                border: `2px solid ${borderColor}`,
-                color: isDark ? '#ffffff' : '#000000',
-                fontFamily: 'inherit',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-                cursor: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 'not-allowed' : 'pointer',
-                opacity: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 0.3 : 1,
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {allowDiagonal ? '8-DIR' : '4-DIR'}
-            </button>
-
-            {/* Biome dropdown — selects grid terrain theme and movement cost */}
-            <div ref={biomeDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              {/* Compact mode toggle — single button, cycles random/corridor, shows current mode */}
               <button
-                onClick={() => setIsBiomeDropdownOpen((prev) => !prev)}
-                disabled={isAnimating || mazeMode === 'corridor'}
-                title={mazeMode === 'corridor' ? 'Biomes only apply in Random mode' : 'Select terrain biome'}
-                aria-label="Select terrain biome"
+                onClick={() => switchMazeMode(mazeMode === 'random' ? 'corridor' : 'random')}
+                disabled={isAnimating}
+                title="Toggle grid generation mode"
+                aria-label="Toggle grid generation mode"
                 style={{
-                  width: '100%',
                   height: '36px',
+                  padding: '0 14px',
                   borderRadius: '8px',
                   backgroundColor: panelBg,
                   border: `2px solid ${borderColor}`,
@@ -868,578 +1026,516 @@ interface ModeSnapshot {
                   fontSize: '12px',
                   fontWeight: 700,
                   letterSpacing: '0.05em',
-                  cursor: (isAnimating || mazeMode === 'corridor') ? 'not-allowed' : 'pointer',
-                  opacity: (isAnimating || mazeMode === 'corridor') ? 0.3 : 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 12px',
+                  cursor: isAnimating ? 'not-allowed' : 'pointer',
+                  opacity: isAnimating ? 0.3 : 1,
+                  flexShrink: 0,
                   whiteSpace: 'nowrap',
                 }}
               >
-                <span>{mazeMode === 'corridor' ? 'CLASSIC' : BIOME_MAP[activeBiome].label}</span>
-                <svg
-                  width="12"
-                  height="12"
+                {mazeMode === 'random' ? 'RANDOM' : 'MAZE'}
+              </button>
+
+              {/* Diagonal movement toggle — locked ON while Theta* is selected, locked OFF while JPS is selected */}
+              <button
+                onClick={() => setAllowDiagonal((prev) => !prev)}
+                disabled={isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps'}
+                title={
+                  selectedAlgo?.id === 'theta'
+                    ? 'Theta* requires 8-directional movement'
+                    : selectedAlgo?.id === 'jps'
+                    ? 'JPS only supports 4-directional movement'
+                    : 'Toggle 4-directional / 8-directional movement'
+                }
+                aria-label="Toggle diagonal movement"
+                style={{
+                  height: '36px',
+                  padding: '0 14px',
+                  borderRadius: '8px',
+                  backgroundColor: panelBg,
+                  border: `2px solid ${borderColor}`,
+                  color: isDark ? '#ffffff' : '#000000',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  cursor: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 'not-allowed' : 'pointer',
+                  opacity: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 0.3 : 1,
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {allowDiagonal ? '8-DIR' : '4-DIR'}
+              </button>
+
+              {/* Biome dropdown — selects grid terrain theme and movement cost */}
+              <div ref={biomeDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                <button
+                  onClick={() => setIsBiomeDropdownOpen((prev) => !prev)}
+                  disabled={isAnimating || mazeMode === 'corridor'}
+                  title={mazeMode === 'corridor' ? 'Biomes only apply in Random mode' : 'Select terrain biome'}
+                  aria-label="Select terrain biome"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    borderRadius: '8px',
+                    backgroundColor: panelBg,
+                    border: `2px solid ${borderColor}`,
+                    color: isDark ? '#ffffff' : '#000000',
+                    fontFamily: 'inherit',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    cursor: (isAnimating || mazeMode === 'corridor') ? 'not-allowed' : 'pointer',
+                    opacity: (isAnimating || mazeMode === 'corridor') ? 0.3 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 12px',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span>{mazeMode === 'corridor' ? 'CLASSIC' : BIOME_MAP[activeBiome].label}</span>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={isDark ? '#ffffff' : '#000000'}
+                    strokeWidth="2"
+                    style={{
+                      flexShrink: 0,
+                      marginLeft: '6px',
+                      transform: isBiomeDropdownOpen ? 'rotate(180deg)' : 'none',
+                      transition: 'transform 0.2s',
+                    }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+
+                {/* Biome list — opens downward, scrollable, shows ~2 items at a time */}
+                <AnimatePresence>
+                  {isBiomeDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        marginTop: '8px',
+                        left: 0,
+                        width: '180px',
+                        maxHeight: '80px',
+                        overflowY: 'auto',
+                        borderRadius: '10px',
+                        backgroundColor: panelBg,
+                        border: `2px solid ${borderColor}`,
+                        boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
+                        zIndex: 100,
+                      }}
+                    >
+                      {BIOME_LIST.map((biome, idx) => (
+                        <button
+                          key={biome.id}
+                          onClick={() => {
+                            handleBiomeChange(biome.id);
+                            setIsBiomeDropdownOpen(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            backgroundColor: panelBg,
+                            border: 'none',
+                            borderBottom:
+                              idx < BIOME_LIST.length - 1
+                                ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                                : 'none',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '12px',
+                            color:
+                              activeBiome === biome.id
+                                ? isDark ? '#ffffff' : '#000000'
+                                : isDark ? '#cccccc' : '#000000',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = panelBg;
+                          }}
+                        >
+                          <span>{biome.label}</span>
+                          <span
+                            style={{
+                              fontSize: '9px',
+                              fontWeight: 700,
+                              letterSpacing: '0.05em',
+                              color: isDark ? '#888888' : '#555555',
+                            }}
+                          >
+                            ×{biome.cost}
+                          </span>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Reroll button — regenerates only the active mode's grid */}
+              <button
+                onClick={handleReroll}
+                disabled={isAnimating}
+                title="Reroll Grid"
+                aria-label="Reroll Grid"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  minWidth: '36px',
+                  borderRadius: '8px',
+                  backgroundColor: panelBg,
+                  border: `2px solid ${borderColor}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: isAnimating ? 'not-allowed' : 'pointer',
+                  opacity: isAnimating ? 0.3 : 1,
+                  flexShrink: 0,
+                  padding: 0,
+                }}
+              >
+                <motion.svg
+                  animate={{ rotate: rotation }}
+                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke={isDark ? '#ffffff' : '#000000'}
                   strokeWidth="2"
-                  style={{
-                    flexShrink: 0,
-                    marginLeft: '6px',
-                    transform: isBiomeDropdownOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s',
-                  }}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </motion.svg>
               </button>
-
-              {/* Biome list — opens downward, scrollable, shows ~2 items at a time */}
-              <AnimatePresence>
-                {isBiomeDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
-                    style={{
-                      position: 'absolute',
-                      top: '100%',
-                      marginTop: '8px',
-                      left: 0,
-                      width: '180px',
-                      maxHeight: '80px',
-                      overflowY: 'auto',
-                      borderRadius: '10px',
-                      backgroundColor: panelBg,
-                      border: `2px solid ${borderColor}`,
-                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
-                      zIndex: 100,
-                    }}
-                  >
-                    {BIOME_LIST.map((biome, idx) => (
-                      <button
-                        key={biome.id}
-                        onClick={() => {
-                          handleBiomeChange(biome.id);
-                          setIsBiomeDropdownOpen(false);
-                        }}
-                        style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 14px',
-                          backgroundColor: panelBg,
-                          border: 'none',
-                          borderBottom:
-                            idx < BIOME_LIST.length - 1
-                              ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
-                              : 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          fontSize: '12px',
-                          color:
-                            activeBiome === biome.id
-                              ? isDark ? '#ffffff' : '#000000'
-                              : isDark ? '#cccccc' : '#000000',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = panelBg;
-                        }}
-                      >
-                        <span>{biome.label}</span>
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            fontWeight: 700,
-                            letterSpacing: '0.05em',
-                            color: isDark ? '#888888' : '#555555',
-                          }}
-                        >
-                          ×{biome.cost}
-                        </span>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
+          )}
 
-            {/* Reroll button — regenerates only the active mode's grid */}
-            <button
-              onClick={handleReroll}
-              disabled={isAnimating}
-              title="Reroll Grid"
-              aria-label="Reroll Grid"
-              style={{
-                width: '36px',
-                height: '36px',
-                minWidth: '36px',
-                borderRadius: '8px',
-                backgroundColor: panelBg,
-                border: `2px solid ${borderColor}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: isAnimating ? 'not-allowed' : 'pointer',
-                opacity: isAnimating ? 0.3 : 1,
-                flexShrink: 0,
-                padding: 0,
-              }}
-            >
-              <motion.svg
-                animate={{ rotate: rotation }}
-                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={isDark ? '#ffffff' : '#000000'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </motion.svg>
-            </button>
-          </div>
+          {compareMode && (
+            <div style={{ display: 'flex', width: '80%', margin: '0 auto' }}>
+              {algorithmDropdownEl}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Right column — 45%, controls start at grid top ── */}
-      <div
-        style={{
-          width: '45%',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-          paddingLeft: '12px',
-          flexShrink: 0,
-        }}
-      >
+      {!compareMode && (
         <div
           style={{
-            width: `${CONTENT_W}px`,
+            width: '45%',
+            height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            gap: `${SECTION_GAP}px`,
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingLeft: '12px',
+            flexShrink: 0,
           }}
         >
+          <div
+            style={{
+              width: `${CONTENT_W}px`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: `${SECTION_GAP}px`,
+            }}
+          >
+            {/* ── Controls row: Reset | Dropdown | RUN ── */}
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', width: '100%' }}>
 
-          {/* ── Controls row: Reset | Dropdown | RUN ── */}
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', width: '100%' }}>
-
-            {/* Reset button */}
-            <button
-              onClick={handleReset}
-              title="Reset Grid"
-              aria-label="Reset Grid"
-              style={{
-                width: `${CTRL_H}px`,
-                height: `${CTRL_H}px`,
-                minWidth: `${CTRL_H}px`,
-                minHeight: `${CTRL_H}px`,
-                borderRadius: '10px',
-                backgroundColor: panelBg,
-                border: `2px solid ${borderColor}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                flexShrink: 0,
-                padding: 0,
-                transition: 'background-color 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = panelBg;
-              }}
-            >
-              <motion.svg
-                animate={{ rotate: rotation }}
-                transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={isDark ? '#ffffff' : '#000000'}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </motion.svg>
-            </button>
-
-            {/* Algorithm dropdown */}
-            <div ref={dropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              {/* Reset button */}
               <button
-                onClick={() => setIsDropdownOpen((prev) => !prev)}
-                disabled={isAnimating}
+                onClick={handleReset}
+                title="Reset Grid"
+                aria-label="Reset Grid"
                 style={{
-                  width: '100%',
+                  width: `${CTRL_H}px`,
                   height: `${CTRL_H}px`,
+                  minWidth: `${CTRL_H}px`,
+                  minHeight: `${CTRL_H}px`,
                   borderRadius: '10px',
                   backgroundColor: panelBg,
                   border: `2px solid ${borderColor}`,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 16px',
-                  cursor: isAnimating ? 'not-allowed' : 'pointer',
-                  opacity: isAnimating ? 0.3 : 1,
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  color: selectedAlgo ? (isDark ? '#ffffff' : '#000000') : (isDark ? '#888888' : '#000000'),
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  padding: 0,
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = panelBg;
                 }}
               >
-                <span>{selectedAlgo ? selectedAlgo.name : 'Select Algorithm'}</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={isDark ? '#ffffff' : '#000000'}
-                  strokeWidth="2"
-                  style={{
-                    flexShrink: 0,
-                    transform: isDropdownOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s',
-                  }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                <Eraser size={16} color={isDark ? '#ffffff' : '#000000'} />
               </button>
 
-              {/* Dropdown menu — opens downward */}
-              <AnimatePresence>
-                {isDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15, ease: 'easeOut' }}
-                    className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
+              {/* Algorithm dropdown */}
+              {algorithmDropdownEl}
+
+              {/* RUN button */}
+              <button
+                disabled={isRunDisabled}
+                onClick={handleRun}
+                style={{
+                  height: `${CTRL_H}px`,
+                  width: '100px',
+                  borderRadius: '10px',
+                  backgroundColor: panelBg,
+                  border: isRunDisabled
+                    ? `2px solid ${borderColor}`
+                    : '2px solid rgba(0,230,118,0.5)',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  color: '#00e676',
+                  cursor: isRunDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isRunDisabled ? 0.3 : 1,
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isFetching ? (
+                  <svg
+                    width="16"
+                    height="16"
+                    className="animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="10" stroke="#00e676" strokeWidth="3" opacity="0.25" />
+                    <path fill="#00e676" opacity="0.75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                ) : (
+                  'RUN'
+                )}
+              </button>
+            </div>
+
+            {/* ── Speed slider + STOP — visible during animation only ── */}
+            <AnimatePresence>
+              {isAnimating && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>S</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={4}
+                    step={1}
+                    value={speed}
+                    onChange={(e) => setSpeed(Number(e.target.value))}
+                    className={isDark ? 'speed-slider' : 'speed-slider-light'}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>F</span>
+                  <button
+                    onClick={handleStop}
                     style={{
-                      position: 'absolute',
-                      top: '100%',
-                      marginTop: '8px',
-                      left: 0,
-                      width: '100%',
-                      maxHeight: '168px',
-                      overflowY: 'auto',
+                      height: '40px',
+                      padding: '0 16px',
+                      borderRadius: '8px',
+                      backgroundColor: panelBg,
+                      border: '1px solid rgba(255,0,0,0.3)',
+                      color: '#ff1744',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    STOP
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── See Stats button + stats panel — post-run only ── */}
+            <AnimatePresence>
+              {(showStats || noPathFound || invalidPlacement) && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: `${SECTION_GAP}px`, width: '100%' }}
+                >
+                  {/* See Stats button */}
+                  <button
+                    onClick={() => setStatsPanelOpen((prev) => !prev)}
+                    style={{
+                      width: `${CONTENT_W}px`,
+                      height: `${CTRL_H}px`,
                       borderRadius: '10px',
                       backgroundColor: panelBg,
                       border: `2px solid ${borderColor}`,
-                      boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.6)' : '0 10px 30px rgba(0,0,0,0.1)',
-                      zIndex: 100,
+                      color: isDark ? '#ffffff' : '#000000',
+                      fontFamily: 'inherit',
+                      fontSize: '15px',
+                      cursor: 'pointer',
                     }}
                   >
-                    {ALGORITHMS.map((algo, idx) => (
-                      <button
-                        key={algo.id}
-                        onClick={() => {
-                          setSelectedAlgo(algo);
-                          setIsDropdownOpen(false);
-                        }}
+                    See Stats
+                  </button>
+
+                  {/* Stats panel */}
+                  <AnimatePresence>
+                    {statsPanelOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.25, ease: 'easeOut' }}
                         style={{
-                          width: '100%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 16px',
-                          backgroundColor: panelBg,
-                          border: 'none',
-                          borderBottom:
-                            idx < ALGORITHMS.length - 1
-                              ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
-                              : 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          fontSize: '14px',
-                          color:
-                            selectedAlgo?.id === algo.id
-                              ? isDark ? '#ffffff' : '#000000'
-                              : isDark ? '#cccccc' : '#000000',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = panelBg;
+                          width: `${CONTENT_W}px`,
+                          borderRadius: '12px',
+                          border: `2px solid ${borderColor}`,
+                          backgroundColor: isDark ? '#111111' : '#e0e0e0',
+                          padding: '20px',
+                          overflow: 'hidden',
                         }}
                       >
-                        <span>{algo.name}</span>
-                        <span
-                          style={{
-                            fontSize: '9px',
-                            fontWeight: 700,
-                            letterSpacing: '0.1em',
-                            color: algo.badgeColor,
-                          }}
-                        >
-                          {algo.tag}
-                        </span>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                        {selectedAlgo && (
+                          <>
+                            <p
+                              style={{
+                                fontSize: '18px',
+                                fontWeight: 700,
+                                color: isDark ? '#ffffff' : '#000000',
+                                margin: '0 0 6px 0',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {selectedAlgo.name}
+                            </p>
+                            <p
+                              style={{
+                                fontSize: '13px',
+                                color: isDark ? '#888888' : '#000000',
+                                margin: '0 0 20px 0',
+                                lineHeight: 1.5,
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {selectedAlgo.description}
+                            </p>
+                          </>
+                        )}
 
-            {/* RUN button */}
-            <button
-              disabled={isRunDisabled}
-              onClick={handleRun}
-              style={{
-                height: `${CTRL_H}px`,
-                width: '100px',
-                borderRadius: '10px',
-                backgroundColor: panelBg,
-                border: isRunDisabled
-                  ? `2px solid ${borderColor}`
-                  : '2px solid rgba(0,230,118,0.5)',
-                fontFamily: 'inherit',
-                fontSize: '14px',
-                fontWeight: 700,
-                color: '#00e676',
-                cursor: isRunDisabled ? 'not-allowed' : 'pointer',
-                opacity: isRunDisabled ? 0.3 : 1,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {isFetching ? (
-                <svg
-                  width="16"
-                  height="16"
-                  className="animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle cx="12" cy="12" r="10" stroke="#00e676" strokeWidth="3" opacity="0.25" />
-                  <path fill="#00e676" opacity="0.75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-              ) : (
-                'RUN'
-              )}
-            </button>
-          </div>
-
-          {/* ── Speed slider + STOP — visible during animation only ── */}
-          <AnimatePresence>
-            {isAnimating && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  width: '100%',
-                }}
-              >
-                <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>S</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={4}
-                  step={1}
-                  value={speed}
-                  onChange={(e) => setSpeed(Number(e.target.value))}
-                  className={isDark ? 'speed-slider' : 'speed-slider-light'}
-                  style={{ flex: 1 }}
-                />
-                <span style={{ fontSize: '12px', color: isDark ? '#888888' : '#000000', flexShrink: 0 }}>F</span>
-                <button
-                  onClick={handleStop}
-                  style={{
-                    height: '40px',
-                    padding: '0 16px',
-                    borderRadius: '8px',
-                    backgroundColor: panelBg,
-                    border: '1px solid rgba(255,0,0,0.3)',
-                    color: '#ff1744',
-                    fontFamily: 'inherit',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  STOP
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* ── See Stats button + stats panel — post-run only ── */}
-          <AnimatePresence>
-            {(showStats || noPathFound || invalidPlacement) && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                style={{ display: 'flex', flexDirection: 'column', gap: `${SECTION_GAP}px`, width: '100%' }}
-              >
-                {/* See Stats button */}
-                <button
-                  onClick={() => setStatsPanelOpen((prev) => !prev)}
-                  style={{
-                    width: `${CONTENT_W}px`,
-                    height: `${CTRL_H}px`,
-                    borderRadius: '10px',
-                    backgroundColor: panelBg,
-                    border: `2px solid ${borderColor}`,
-                    color: isDark ? '#ffffff' : '#000000',
-                    fontFamily: 'inherit',
-                    fontSize: '15px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  See Stats
-                </button>
-
-                {/* Stats panel */}
-                <AnimatePresence>
-                  {statsPanelOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.25, ease: 'easeOut' }}
-                      style={{
-                        width: `${CONTENT_W}px`,
-                        borderRadius: '12px',
-                        border: `2px solid ${borderColor}`,
-                        backgroundColor: isDark ? '#111111' : '#e0e0e0',
-                        padding: '20px',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {selectedAlgo && (
-                        <>
-                          <p
-                            style={{
-                              fontSize: '18px',
-                              fontWeight: 700,
-                              color: isDark ? '#ffffff' : '#000000',
-                              margin: '0 0 6px 0',
-                              fontFamily: 'inherit',
-                            }}
-                          >
-                            {selectedAlgo.name}
-                          </p>
+                        {(noPathFound || invalidPlacement) && (
                           <p
                             style={{
                               fontSize: '13px',
-                              color: isDark ? '#888888' : '#000000',
-                              margin: '0 0 20px 0',
-                              lineHeight: 1.5,
+                              color: '#ff1744',
+                              margin: '0 0 16px 0',
                               fontFamily: 'inherit',
                             }}
                           >
-                            {selectedAlgo.description}
+                            {noPathFound ? 'NO PATH FOUND' : 'INVALID START/END POINT'}
                           </p>
-                        </>
-                      )}
+                        )}
 
-                      {(noPathFound || invalidPlacement) && (
-                        <p
-                          style={{
-                            fontSize: '13px',
-                            color: '#ff1744',
-                            margin: '0 0 16px 0',
-                            fontFamily: 'inherit',
-                          }}
-                        >
-                          {noPathFound ? 'NO PATH FOUND' : 'INVALID START/END POINT'}
-                        </p>
-                      )}
-
-                      {solveResult && (
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          {[
-                            { label: 'Nodes Visited', value: String(solveResult.nodesVisited) },
-                            { label: 'Path Length',   value: String(solveResult.pathLength) },
-                            { label: 'Time Taken',    value: `${solveResult.timeTaken.toFixed(2)}ms` },
-                            {
-                              label: 'Complexity',
-                              value: selectedAlgo ? ALGO_COMPLEXITY[selectedAlgo.id] ?? '—' : '—',
-                            },
-                          ].map((row, idx) => (
-                            <div
-                              key={row.label}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                height: '52px',
-                                minHeight: '52px',
-                                borderBottom:
-                                  idx < 3
-                                    ? `1px solid ${borderColor}`
-                                    : 'none',
-                              }}
-                            >
-                              <span
+                        {solveResult && (
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {[
+                              { label: 'Nodes Visited', value: String(solveResult.nodesVisited) },
+                              { label: 'Path Length',   value: String(solveResult.pathLength) },
+                              { label: 'Time Taken',    value: `${solveResult.timeTaken.toFixed(2)}ms` },
+                              {
+                                label: 'Complexity',
+                                value: selectedAlgo ? ALGO_COMPLEXITY[selectedAlgo.id] ?? '—' : '—',
+                              },
+                            ].map((row, idx) => (
+                              <div
+                                key={row.label}
                                 style={{
-                                  fontSize: '15px',
-                                  color: isDark ? '#888888' : '#000000',
-                                  fontFamily: 'inherit',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  height: '52px',
+                                  minHeight: '52px',
+                                  borderBottom:
+                                    idx < 3
+                                      ? `1px solid ${borderColor}`
+                                      : 'none',
                                 }}
                               >
-                                {row.label}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: '16px',
-                                  color: isDark ? '#ffffff' : '#000000',
-                                  fontFamily: 'inherit',
-                                  padding: '4px 14px',
-                                  borderRadius: '6px',
-                                  border: `1px solid ${borderColor}`,
-                                  backgroundColor: valueBoxBg,
-                                  minWidth: '48px',
-                                  textAlign: 'center',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {row.value}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
+                                <span
+                                  style={{
+                                    fontSize: '15px',
+                                    color: isDark ? '#888888' : '#000000',
+                                    fontFamily: 'inherit',
+                                  }}
+                                >
+                                  {row.label}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '16px',
+                                    color: isDark ? '#ffffff' : '#000000',
+                                    fontFamily: 'inherit',
+                                    padding: '4px 14px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: valueBoxBg,
+                                    minWidth: '48px',
+                                    textAlign: 'center',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {row.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
-};
+});

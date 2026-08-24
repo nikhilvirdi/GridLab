@@ -1,9 +1,32 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GridCanvas } from './canvas/GridCanvas';
+import type { GridCanvasHandle } from './canvas/GridCanvas';
+import type { SolveResult } from './algorithms/types';
+
+type Point = { r: number; c: number };
 
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [view, setView] = useState<'single' | 'compare'>('single');
+
+  // Shared state for compare view — both grids stay in sync
+  const [sharedGrid, setSharedGrid] = useState<number[][]>([]);
+  const [sharedStart, setSharedStart] = useState<Point | null>(null);
+  const [sharedEnd, setSharedEnd] = useState<Point | null>(null);
+
+  // Refs and per-side state for the comparison panel
+  const leftRef = useRef<GridCanvasHandle>(null);
+  const rightRef = useRef<GridCanvasHandle>(null);
+  const [leftAlgo, setLeftAlgo] = useState<string | null>(null);
+  const [rightAlgo, setRightAlgo] = useState<string | null>(null);
+  const [leftResult, setLeftResult] = useState<SolveResult | null>(null);
+  const [rightResult, setRightResult] = useState<SolveResult | null>(null);
+  const [leftComplexity, setLeftComplexity] = useState<string | null>(null);
+  const [rightComplexity, setRightComplexity] = useState<string | null>(null);
+  const [leftBusy, setLeftBusy] = useState(false);
+  const [rightBusy, setRightBusy] = useState(false);
+  const [sharedSpeed, setSharedSpeed] = useState(2);
 
   const isDark = theme === 'dark';
 
@@ -23,6 +46,30 @@ function App() {
         className="fixed z-50"
         style={{ top: '24px', left: '50%', transform: 'translateX(-50%)', height: '56px', width: 'auto' }}
       />
+
+      {/* Compare button — fixed top-left */}
+      <button
+        onClick={() => setView((prev) => (prev === 'single' ? 'compare' : 'single'))}
+        aria-label={view === 'single' ? 'Compare' : 'Exit Compare'}
+        className="fixed z-50 flex items-center justify-center"
+        style={{
+          top: '24px',
+          left: '32px',
+          height: '44px',
+          padding: '0 16px',
+          borderRadius: '22px',
+          backgroundColor: isDark ? '#111111' : '#e0e0e0',
+          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
+          color: isDark ? '#ffffff' : '#000000',
+          fontFamily: 'inherit',
+          fontSize: '13px',
+          fontWeight: 600,
+          letterSpacing: '0.04em',
+          cursor: 'pointer',
+        }}
+      >
+        {view === 'single' ? 'Compare' : 'Exit Compare'}
+      </button>
 
       {/* Theme toggle — fixed top-right */}
       <button
@@ -84,19 +131,193 @@ function App() {
         </AnimatePresence>
       </button>
 
-      {/* Main content — two column layout */}
-      <div
-        style={{
-          paddingTop: '56px',
-          height: 'calc(100vh - 56px)',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'row',
-          width: '100%',
-        }}
-      >
-        <GridCanvas size={50} theme={theme} />
-      </div>
+      {/* Main content — single vs compare view */}
+      {view === 'single' ? (
+        <div
+          style={{
+            paddingTop: '56px',
+            height: 'calc(100vh - 56px)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'row',
+            width: '100%',
+          }}
+        >
+          <GridCanvas size={50} theme={theme} />
+        </div>
+      ) : (
+        <div
+          style={{
+            paddingTop: '56px',
+            height: 'calc(100vh - 56px)',
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: '32px',
+            width: '100%',
+          }}
+        >
+          <GridCanvas
+            ref={leftRef}
+            size={50}
+            theme={theme}
+            compareMode={true}
+            externalGrid={sharedGrid}
+            externalStartPoint={sharedStart}
+            externalEndPoint={sharedEnd}
+            onGridGenerated={setSharedGrid}
+            onStartPointChange={setSharedStart}
+            onEndPointChange={setSharedEnd}
+            externalSpeed={sharedSpeed}
+            onSolveResultChange={(result, complexity) => { setLeftResult(result); setLeftComplexity(complexity); }}
+            onSelectedAlgoChange={setLeftAlgo}
+            onBusyChange={setLeftBusy}
+          />
+
+          {/* Middle comparison panel */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              padding: '0 24px',
+              minWidth: '260px',
+            }}
+          >
+            <button
+              onClick={() => {
+                leftRef.current?.run();
+                rightRef.current?.run();
+              }}
+              disabled={leftBusy || rightBusy}
+              style={{
+                width: '100%',
+                height: '48px',
+                borderRadius: '10px',
+                border: '2px solid #00e676',
+                backgroundColor: 'transparent',
+                color: '#00e676',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                cursor: (leftBusy || rightBusy) ? 'not-allowed' : 'pointer',
+                opacity: (leftBusy || rightBusy) ? 0.4 : 1,
+              }}
+            >
+              RUN BOTH
+            </button>
+
+            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+              <button
+                onClick={() => {
+                  leftRef.current?.clear();
+                  rightRef.current?.clear();
+                  setSharedStart(null);
+                  setSharedEnd(null);
+                }}
+                style={{
+                  flex: 1,
+                  height: '40px',
+                  borderRadius: '8px',
+                  border: `2px solid ${isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)'}`,
+                  backgroundColor: 'transparent',
+                  color: isDark ? '#ffffff' : '#000000',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                CLEAR
+              </button>
+              <button
+                onClick={() => {
+                  leftRef.current?.reroll();
+                  rightRef.current?.clear();
+                }}
+                style={{
+                  flex: 1,
+                  height: '40px',
+                  borderRadius: '8px',
+                  border: `2px solid ${isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)'}`,
+                  backgroundColor: 'transparent',
+                  color: isDark ? '#ffffff' : '#000000',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  cursor: 'pointer',
+                }}
+              >
+                REROLL
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+              <span style={{ fontSize: '10px', color: isDark ? '#888888' : '#555555' }}>S</span>
+              <input
+                type="range"
+                min={0}
+                max={4}
+                step={1}
+                value={sharedSpeed}
+                onChange={(e) => setSharedSpeed(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: '10px', color: isDark ? '#888888' : '#555555' }}>F</span>
+            </div>
+
+            {(leftResult || rightResult) && (
+              <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+                <div style={{ flex: 1, fontSize: '11px', color: isDark ? '#cccccc' : '#333333' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '6px' }}>{leftAlgo ?? '—'}</div>
+                  {leftResult && (
+                    <>
+                      <div>Visited: {leftResult.nodesVisited}</div>
+                      <div>Path: {leftResult.pathLength}</div>
+                      <div>Time: {leftResult.timeTaken.toFixed(2)}ms</div>
+                      <div>Complexity: {leftComplexity ?? '—'}</div>
+                    </>
+                  )}
+                </div>
+                <div style={{ flex: 1, fontSize: '11px', color: isDark ? '#cccccc' : '#333333' }}>
+                  <div style={{ fontWeight: 700, marginBottom: '6px' }}>{rightAlgo ?? '—'}</div>
+                  {rightResult && (
+                    <>
+                      <div>Visited: {rightResult.nodesVisited}</div>
+                      <div>Path: {rightResult.pathLength}</div>
+                      <div>Time: {rightResult.timeTaken.toFixed(2)}ms</div>
+                      <div>Complexity: {rightComplexity ?? '—'}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <GridCanvas
+            ref={rightRef}
+            size={50}
+            theme={theme}
+            compareMode={true}
+            externalGrid={sharedGrid}
+            externalStartPoint={sharedStart}
+            externalEndPoint={sharedEnd}
+            onGridGenerated={setSharedGrid}
+            onStartPointChange={setSharedStart}
+            onEndPointChange={setSharedEnd}
+            externalSpeed={sharedSpeed}
+            onSolveResultChange={(result, complexity) => { setRightResult(result); setRightComplexity(complexity); }}
+            onSelectedAlgoChange={setRightAlgo}
+            onBusyChange={setRightBusy}
+          />
+        </div>
+      )}
     </div>
   );
 }
