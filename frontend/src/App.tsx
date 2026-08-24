@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GridCanvas } from './canvas/GridCanvas';
 import type { GridCanvasHandle } from './canvas/GridCanvas';
 import type { SolveResult } from './algorithms/types';
+import { useIsMobile } from './hooks/useIsMobile';
 
 type Point = { r: number; c: number };
 
@@ -29,12 +30,15 @@ function App() {
   const [sharedSpeed, setSharedSpeed] = useState(2);
 
   const isDark = theme === 'dark';
+  const isMobile = useIsMobile();
 
   return (
     <div
       className="overflow-hidden select-none"
       style={{
-        height: '100vh',
+        height: isMobile ? 'auto' : '100vh',
+        minHeight: isMobile ? '100vh' : undefined,
+        overflow: isMobile ? 'visible' : 'hidden',
         backgroundColor: isDark ? '#000000' : '#f0f0f0',
         color: isDark ? '#ffffff' : '#000000',
       }}
@@ -44,7 +48,13 @@ function App() {
         src={isDark ? `${import.meta.env.BASE_URL}gridlab_logo.png` : `${import.meta.env.BASE_URL}gridlab_logo_lighttheme.png`}
         alt="GridLab"
         className="fixed z-50"
-        style={{ top: '24px', left: '50%', transform: 'translateX(-50%)', height: '56px', width: 'auto' }}
+        style={{
+          top: isMobile ? '14px' : '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          height: isMobile ? '32px' : '56px',
+          width: 'auto',
+        }}
       />
 
       {/* Compare button — fixed top-left */}
@@ -53,16 +63,16 @@ function App() {
         aria-label={view === 'single' ? 'Compare' : 'Exit Compare'}
         className="fixed z-50 flex items-center justify-center"
         style={{
-          top: '24px',
-          left: '32px',
-          height: '44px',
-          padding: '0 16px',
-          borderRadius: '22px',
+          top: isMobile ? '14px' : '24px',
+          left: isMobile ? '12px' : '32px',
+          height: isMobile ? '32px' : '44px',
+          padding: isMobile ? '0 10px' : '0 16px',
+          borderRadius: isMobile ? '16px' : '22px',
           backgroundColor: isDark ? '#111111' : '#e0e0e0',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
           color: isDark ? '#ffffff' : '#000000',
           fontFamily: 'inherit',
-          fontSize: '13px',
+          fontSize: isMobile ? '11px' : '13px',
           fontWeight: 600,
           letterSpacing: '0.04em',
           cursor: 'pointer',
@@ -77,10 +87,10 @@ function App() {
         aria-label="Toggle Theme"
         className="fixed z-50 flex items-center justify-center"
         style={{
-          top: '24px',
-          right: '32px',
-          width: '44px',
-          height: '44px',
+          top: isMobile ? '14px' : '24px',
+          right: isMobile ? '12px' : '32px',
+          width: isMobile ? '32px' : '44px',
+          height: isMobile ? '32px' : '44px',
           borderRadius: '50%',
           backgroundColor: isDark ? '#111111' : '#e0e0e0',
           border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)'}`,
@@ -100,8 +110,8 @@ function App() {
             {isDark ? (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="22"
-                height="22"
+                width={isMobile ? '16' : '22'}
+                height={isMobile ? '16' : '22'}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="#ffffff"
@@ -114,8 +124,8 @@ function App() {
             ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
+                width={isMobile ? '16' : '20'}
+                height={isMobile ? '16' : '20'}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="#000000"
@@ -135,11 +145,13 @@ function App() {
       {view === 'single' ? (
         <div
           style={{
-            paddingTop: '56px',
-            height: 'calc(100vh - 56px)',
-            overflow: 'hidden',
+            paddingTop: isMobile ? '68px' : '56px',
+            paddingBottom: isMobile ? '48px' : 0,
+            height: isMobile ? 'auto' : 'calc(100vh - 56px)',
+            overflow: isMobile ? 'visible' : 'hidden',
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'center' : undefined,
             width: '100%',
           }}
         >

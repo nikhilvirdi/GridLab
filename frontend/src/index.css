@@ -25,6 +25,17 @@ body,
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
 /* Speed slider — dark theme */
 input[type='range'].speed-slider {
   -webkit-appearance: none;

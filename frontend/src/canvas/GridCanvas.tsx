@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } f
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eraser } from 'lucide-react';
 import LoaderOne from '../components/LoaderOne';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { generateMaze, generateCorridorMaze, generateClusteredTerrain, generateRiverTerrain, generateGlacierTerrain } from '../algorithms/maze';
 import { solveBFS } from '../algorithms/bfs';
 import { solveDFS } from '../algorithms/dfs';
@@ -197,6 +198,23 @@ export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function
   const stoppedEarlyRef = useRef(false);
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
+
+  // Mobile-responsive grid sizing — only affects the single (non-compare)
+  // view. compareMode always resolves to GRID_PX unchanged; compare mode's
+  // mobile layout is out of scope for this change.
+  const isMobile = useIsMobile();
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : GRID_PX
+  );
+  useEffect(() => {
+    if (!isMobile || compareMode) return;
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile, compareMode]);
+  const mobileGridPx = Math.min(viewportWidth - 40, 480);
+  const gridPx = (isMobile && !compareMode) ? mobileGridPx : GRID_PX;
 
 interface ModeSnapshot {
   grid: number[][];
@@ -479,10 +497,11 @@ interface ModeSnapshot {
     return () => document.removeEventListener('mousedown', fn);
   }, []);
 
-  // Fixed 520px grid — no resize needed
+  // Grid pixel size — fixed at GRID_PX on desktop and in compare mode;
+  // recalculated from viewport width on mobile single view.
   useEffect(() => {
-    setDimensions({ width: GRID_PX, height: GRID_PX });
-  }, []);
+    setDimensions({ width: gridPx, height: gridPx });
+  }, [gridPx]);
 
   // Canvas click handler — DO NOT MODIFY
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -934,8 +953,13 @@ interface ModeSnapshot {
 
   return (
     <div
-      className="flex flex-row select-none"
-      style={{ width: compareMode ? 'auto' : '100%', height: '100%' }}
+      className="flex select-none"
+      style={{
+        width: compareMode ? 'auto' : '100%',
+        height: (isMobile && !compareMode) ? 'auto' : '100%',
+        flexDirection: (isMobile && !compareMode) ? 'column' : 'row',
+        alignItems: (isMobile && !compareMode) ? 'center' : undefined,
+      }}
     >
       {/* Fullscreen loader */}
       <AnimatePresence>
@@ -952,15 +976,15 @@ interface ModeSnapshot {
         )}
       </AnimatePresence>
 
-      {/* ── Left column — 55%, grid+controls centered flush-right with padding (auto in compareMode) ── */}
+      {/* ── Left column — 55%, grid+controls centered flush-right with padding (auto in compareMode; full-width and centered on mobile single view) ── */}
       <div
         style={{
-          width: compareMode ? 'auto' : '55%',
-          height: '100%',
+          width: (isMobile && !compareMode) ? '100%' : (compareMode ? 'auto' : '55%'),
+          height: (isMobile && !compareMode) ? 'auto' : '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: compareMode ? 'center' : 'flex-end',
-          paddingRight: compareMode ? 0 : '52px',
+          justifyContent: (isMobile && !compareMode) ? 'center' : (compareMode ? 'center' : 'flex-end'),
+          paddingRight: (isMobile && !compareMode) ? 0 : (compareMode ? 0 : '52px'),
           flexShrink: 0,
         }}
       >
@@ -969,7 +993,7 @@ interface ModeSnapshot {
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            width: `${GRID_PX}px`,
+            width: `${gridPx}px`,
             flexShrink: 0,
             paddingBottom: compareMode ? '45px' : 0,
           }}
@@ -978,8 +1002,8 @@ interface ModeSnapshot {
           <div
             ref={containerRef}
             style={{
-              width: `${GRID_PX}px`,
-              height: `${GRID_PX}px`,
+              width: `${gridPx}px`,
+              height: `${gridPx}px`,
               boxSizing: 'content-box',
               flexShrink: 0,
               backgroundColor: isDark ? '#0d0d0d' : '#ffffff',
@@ -1239,23 +1263,24 @@ interface ModeSnapshot {
         </div>
       </div>
 
-      {/* ── Right column — 45%, controls start at grid top ── */}
+      {/* ── Right column — 45%, controls start at grid top (full-width, stacked below grid on mobile) ── */}
       {!compareMode && (
         <div
           style={{
-            width: '45%',
-            height: '100%',
+            width: isMobile ? '100%' : '45%',
+            height: isMobile ? 'auto' : '100%',
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-            paddingLeft: '12px',
+            alignItems: isMobile ? 'center' : 'flex-start',
+            justifyContent: isMobile ? 'flex-start' : 'center',
+            paddingLeft: isMobile ? 0 : '12px',
+            paddingTop: isMobile ? '24px' : 0,
             flexShrink: 0,
           }}
         >
           <div
             style={{
-              width: `${CONTENT_W}px`,
+              width: isMobile ? `${gridPx}px` : `${CONTENT_W}px`,
               display: 'flex',
               flexDirection: 'column',
               gap: `${SECTION_GAP}px`,
@@ -1402,7 +1427,7 @@ interface ModeSnapshot {
                   <button
                     onClick={() => setStatsPanelOpen((prev) => !prev)}
                     style={{
-                      width: `${CONTENT_W}px`,
+                      width: '100%',
                       height: `${CTRL_H}px`,
                       borderRadius: '10px',
                       backgroundColor: panelBg,
@@ -1425,7 +1450,7 @@ interface ModeSnapshot {
                         exit={{ opacity: 0, height: 0 }}
                         transition={{ duration: 0.25, ease: 'easeOut' }}
                         style={{
-                          width: `${CONTENT_W}px`,
+                          width: '100%',
                           borderRadius: '12px',
                           border: `2px solid ${borderColor}`,
                           backgroundColor: isDark ? '#111111' : '#e0e0e0',
