@@ -16,12 +16,12 @@ function App() {
         color: isDark ? '#ffffff' : '#000000',
       }}
     >
-      {/* Logo — fixed top-left */}
+      {/* Logo — fixed top-center */}
       <img
         src={isDark ? `${import.meta.env.BASE_URL}gridlab_logo.png` : `${import.meta.env.BASE_URL}gridlab_logo_lighttheme.png`}
         alt="GridLab"
         className="fixed z-50"
-        style={{ top: '24px', left: '32px', height: '56px', width: 'auto' }}
+        style={{ top: '24px', left: '50%', transform: 'translateX(-50%)', height: '56px', width: 'auto' }}
       />
 
       {/* Theme toggle — fixed top-right */}

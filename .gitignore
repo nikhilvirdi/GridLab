@@ -2,3 +2,18 @@ node_modules/
 dist/
 build/
 .env
+# Env files
+.env
+.env.local
+
+# Debug artifacts
+codebase.txt
+
+# Editor/OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# TS build cache
+*.tsbuildinfo
