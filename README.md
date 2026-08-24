@@ -7,39 +7,54 @@ A grid-based pathfinding visualizer. Pick two points, pick an algorithm, watch i
 
 ## About GridLab
 
-GridLab is a mini project I built for my CSE 4th semester Design and Analysis of Algorithms (DAA) coursework. It's a 50×50 interactive grid where you can place walls, set a start and end point, and watch six different pathfinding algorithms explore in real time. Live stats show nodes visited, path length, time taken, and complexity for each run.
+GridLab is a mini project I built for my CSE 4th semester Design and Analysis of Algorithms (DAA) coursework. It's a 50×50 interactive grid where you can place walls, set a start and end point, and watch pathfinding algorithms explore in real time. Live stats show nodes visited, path length, time taken, and complexity for each run.
 
-It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and turned into a small tool I kept polishing.
+It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and grew from there: seven algorithms instead of six, a corridor-based maze generator alongside the original random walls, five terrain biomes with their own movement costs and obstacle types, a diagonal-movement toggle, and a side-by-side comparison mode for running two algorithms on the same grid at once.
 
-<img width="1918" height="1013" alt="inital screenshot" src="https://github.com/user-attachments/assets/a2231f02-303f-4e82-a245-2be4320215bd" />
-<img width="1918" height="977" alt="final screenshot" src="https://github.com/user-attachments/assets/8e3dd516-6709-4347-bb9a-4f37608c0aa7" />
+<!-- screenshot: a biome (Volcanic or Tundra) with a completed algorithm run -->
+<!-- screenshot: maze mode showing generated corridors -->
+<!-- screenshot: comparison mode, two grids + middle stats panel -->
 
 ## Algorithms
 
-Six algorithms, six different ways of exploring the same grid:
+Seven algorithms, seven different ways of exploring the same grid.
 
-| Algorithm | Description | Time Complexity | Explores | Guarantees Shortest Path |
-|---|---|---|---|---|
-| [BFS](docs/bfs.md) | Explores all neighbors level by level. | O(V + E) | All directions, level by level | Yes (unweighted grids) |
-| [DFS](docs/dfs.md) | Explores as deep as possible before backtracking. | O(V + E) | Depth-first, backtracks on dead ends | No |
-| [A\*](docs/astar.md) | Uses heuristics to find the shortest path efficiently. Evaluates f(n) = g(n) + h(n). | O(E log V) | Heuristic-guided | Yes (unweighted grids) |
-| [JPS](docs/jps.md) | An optimized version of A* for grid maps. Jumps over nodes to speed up path calculation. | O(E log V) | Heuristic-guided, jumps over nodes | Yes (unweighted grids) |
-| [Bi-BFS](docs/bidirectional-bfs.md) | Runs two simultaneous breadth-first searches from start and end. Meets in the middle. | O(b^(d/2)) | Bidirectional, meets in the middle | Yes (unweighted grids) |
-| [Greedy](docs/greedy.md) | Explores nodes based on heuristic estimate of distance to end. Fast but not optimal. | O(E log V) | Heuristic-guided | No |
+**BFS** explores the grid one distance-level at a time using a FIFO queue, visiting every neighbor at distance 1 before moving to distance 2, and so on. Because it never skips ahead to a farther node before finishing the closer ones, it's guaranteed to find the shortest path on an unweighted grid. The trade-off is that it explores in every direction equally, with no sense of where the goal actually is, so it can end up visiting far more nodes than necessary before reaching the destination.
 
-Each algorithm name links to a writeup in `docs/`: theory, pseudocode, complexity derivation, implementations in Java/C++/Python/JS, trade-offs, and real-world use cases.
+**DFS** commits to a single path and follows it as deep as possible before backtracking, using a stack instead of BFS's queue. It doesn't guarantee the shortest path — a promising-looking branch can lead into a long dead end that eats time before backtracking to try something else. What it's good at is being simple and fast, and it naturally suits problems where the goal is to explore a whole structure rather than find the shortest route through it.
+
+**A\*** balances how far it's already traveled against an estimate of how far is left, scoring each node as f(n) = g(n) + h(n) with a Manhattan-distance heuristic (Chebyshev when diagonal movement is on). This lets it head toward the goal instead of exploring blindly like BFS, while still guaranteeing the shortest path as long as the heuristic never overestimates the true distance, which both heuristics satisfy here. Set the heuristic to zero and A* reduces exactly to Dijkstra's algorithm — it isn't a separate algorithm in GridLab, just a special case of this one.
+
+**JPS** (Jump Point Search) is an optimization built on top of A*, specifically for grid maps. Instead of expanding one cell at a time, it jumps over long straight corridors and only stops where the path could genuinely change direction, cutting down drastically on how many nodes actually enter the search. It finds the exact same optimal path as A*, just faster on open grids — though the advantage shrinks on maze-like layouts with lots of walls, since there are fewer long corridors to skip in the first place.
+
+**Theta\*** is a cousin of A* that produces smoother, more natural-looking paths by checking line-of-sight between a node and its grandparent and shortcutting directly there when the line is clear, skipping the current node entirely. This gets rid of A*'s staircase-y zig-zag on diagonal moves in favor of paths that look like how you'd actually walk them. Because "how far is genuinely left" only means something with real distance, Theta* uses true Euclidean distance for its costs and heuristic instead of counting grid steps like everything else here — and it only makes sense with diagonal movement turned on, so selecting it locks the grid to 8-directional mode.
+
+**Bi-BFS** (Bidirectional BFS) runs two BFS searches at once, one from the start and one from the end, and stops the instant the two frontiers meet. Since each side only has to search out to roughly half the total distance, the total area explored shrinks dramatically compared to a single BFS covering the whole distance from one side alone. The gain gets bigger the farther apart the start and end points are.
+
+**Greedy** picks whichever open node looks closest to the goal, using the heuristic alone with no memory of how far it's already traveled. That makes it fast, often visiting fewer nodes than A*, but it has no way to reconsider a decision once made, so it can walk straight into a dead end it didn't see coming and end up taking a longer route than necessary. It trades away the optimality guarantee for speed.
+
+| Algorithm | Time Complexity | Guarantees Shortest Path |
+|---|---|---|
+| BFS | O(V + E) | Yes (unweighted grids) |
+| DFS | O(V + E) | No |
+| A* | O(E log V) | Yes |
+| JPS | O(E log V) | Yes |
+| Theta* | O(E log V) | Yes |
+| Bi-BFS | O(b^(d/2)) | Yes (unweighted grids) |
+| Greedy | O(E log V) | No |
 
 ## Tech Stack
 
-| Tech | Version |
+| Tech | Usage |
 |---|---|
-| React | ^19.2.6 |
-| TypeScript | ~6.0.2 |
-| Vite | ^8.0.12 |
-| Tailwind CSS | ^3.4.19 |
-| Framer Motion | ^12.39.0 |
-| clsx | ^2.1.1 |
-| tailwind-merge | ^3.6.0 |
+| React | UI framework — component rendering and state |
+| TypeScript | Type safety across the codebase |
+| Vite | Dev server and build tooling |
+| Tailwind CSS | Utility-based styling |
+| Framer Motion | Dropdown open/close animations, stats panel transitions, reroll icon rotation |
+| clsx | Conditional className composition |
+| tailwind-merge | Merging conflicting Tailwind classes |
+| lucide-react | Icons (Eraser, chevrons, etc.) |
 
 ## Project Link
 
