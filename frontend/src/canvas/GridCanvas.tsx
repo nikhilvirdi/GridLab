@@ -199,22 +199,20 @@ export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
 
-  // Mobile-responsive grid sizing — only affects the single (non-compare)
-  // view. compareMode always resolves to GRID_PX unchanged; compare mode's
-  // mobile layout is out of scope for this change.
+  // Mobile-responsive grid sizing — scales grid dynamically on mobile viewports
   const isMobile = useIsMobile();
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : GRID_PX
   );
   useEffect(() => {
-    if (!isMobile || compareMode) return;
+    if (!isMobile) return;
     const handleResize = () => setViewportWidth(window.innerWidth);
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isMobile, compareMode]);
+  }, [isMobile]);
   const mobileGridPx = Math.min(viewportWidth - 40, 480);
-  const gridPx = (isMobile && !compareMode) ? mobileGridPx : GRID_PX;
+  const gridPx = isMobile ? mobileGridPx : GRID_PX;
 
 interface ModeSnapshot {
   grid: number[][];
@@ -955,10 +953,10 @@ interface ModeSnapshot {
     <div
       className="flex select-none"
       style={{
-        width: compareMode ? 'auto' : '100%',
-        height: (isMobile && !compareMode) ? 'auto' : '100%',
-        flexDirection: (isMobile && !compareMode) ? 'column' : 'row',
-        alignItems: (isMobile && !compareMode) ? 'center' : undefined,
+        width: compareMode ? (isMobile ? '100%' : 'auto') : '100%',
+        height: isMobile ? 'auto' : '100%',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'center' : undefined,
       }}
     >
       {/* Fullscreen loader */}
@@ -976,15 +974,15 @@ interface ModeSnapshot {
         )}
       </AnimatePresence>
 
-      {/* ── Left column — 55%, grid+controls centered flush-right with padding (auto in compareMode; full-width and centered on mobile single view) ── */}
+      {/* ── Left column — 55%, grid+controls centered flush-right with padding (auto in compareMode; full-width and centered on mobile) ── */}
       <div
         style={{
-          width: (isMobile && !compareMode) ? '100%' : (compareMode ? 'auto' : '55%'),
-          height: (isMobile && !compareMode) ? 'auto' : '100%',
+          width: isMobile ? '100%' : (compareMode ? 'auto' : '55%'),
+          height: isMobile ? 'auto' : '100%',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: (isMobile && !compareMode) ? 'center' : (compareMode ? 'center' : 'flex-end'),
-          paddingRight: (isMobile && !compareMode) ? 0 : (compareMode ? 0 : '52px'),
+          justifyContent: isMobile ? 'center' : (compareMode ? 'center' : 'flex-end'),
+          paddingRight: isMobile ? 0 : (compareMode ? 0 : '52px'),
           flexShrink: 0,
         }}
       >
@@ -995,7 +993,7 @@ interface ModeSnapshot {
             gap: '12px',
             width: `${gridPx}px`,
             flexShrink: 0,
-            paddingBottom: compareMode ? '45px' : 0,
+            paddingBottom: (compareMode && !isMobile) ? '45px' : 0,
           }}
         >
           {/* Grid container — UNCHANGED internals */}
@@ -1256,7 +1254,7 @@ interface ModeSnapshot {
           )}
 
           {compareMode && (
-            <div style={{ display: 'flex', width: '80%', margin: '0 auto' }}>
+            <div style={{ display: 'flex', width: isMobile ? '100%' : '80%', margin: '0 auto' }}>
               {algorithmDropdownEl}
             </div>
           )}

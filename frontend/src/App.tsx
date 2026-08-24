@@ -160,14 +160,15 @@ function App() {
       ) : (
         <div
           style={{
-            paddingTop: '56px',
-            height: 'calc(100vh - 56px)',
-            overflow: 'hidden',
+            paddingTop: isMobile ? '68px' : '56px',
+            paddingBottom: isMobile ? '48px' : 0,
+            height: isMobile ? 'auto' : 'calc(100vh - 56px)',
+            overflow: isMobile ? 'visible' : 'hidden',
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'center',
             alignItems: 'center',
-            gap: '32px',
+            gap: isMobile ? '24px' : '32px',
             width: '100%',
           }}
         >
@@ -195,8 +196,11 @@ function App() {
               flexDirection: 'column',
               alignItems: 'center',
               gap: '16px',
-              padding: '0 24px',
-              minWidth: '260px',
+              padding: isMobile ? '0 20px' : '0 24px',
+              width: isMobile ? '100%' : 'auto',
+              maxWidth: isMobile ? '480px' : undefined,
+              minWidth: isMobile ? undefined : '260px',
+              boxSizing: 'border-box',
             }}
           >
             <button
