@@ -6,6 +6,7 @@ import { solveBFS } from '../algorithms/bfs';
 import { solveDFS } from '../algorithms/dfs';
 import { solveAStar } from '../algorithms/astar';
 import { solveJPS } from '../algorithms/jps';
+import { solveThetaStar } from '../algorithms/theta';
 import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
 import { solveGreedy } from '../algorithms/greedy';
 
@@ -49,6 +50,7 @@ const ALGO_SOLVERS: Record<
   dfs: solveDFS,
   astar: solveAStar,
   jps: solveJPS,
+  theta: solveThetaStar,
   'bidirectional-bfs': solveBidirectionalBFS,
   greedy: solveGreedy,
 };
@@ -75,6 +77,11 @@ const ALGORITHMS: AlgorithmOption[] = [
     description: 'AN OPTIMIZED VERSION OF A* FOR GRID MAPS. JUMPS OVER NODES TO SPEED UP PATH CALCULATION.'
   },
   {
+    id: 'theta', name: 'THETA*', tag: 'OPTIMIZED',
+    badgeColor: '#1a7fd4', badgeBg: 'rgba(26,127,212,0.08)',
+    description: 'ANY-ANGLE VERSION OF A*. USES LINE-OF-SIGHT CHECKS TO SHORTCUT PATHS FOR SMOOTHER, MORE DIRECT ROUTES. REQUIRES 8-DIRECTIONAL MOVEMENT.'
+  },
+  {
     id: 'bidirectional-bfs', name: 'BI-BFS', tag: 'ADVANCED',
     badgeColor: '#00e676', badgeBg: 'rgba(0,230,118,0.08)',
     description: 'RUNS TWO SIMULTANEOUS BREADTH-FIRST SEARCHES FROM START AND END. MEETS IN THE MIDDLE.'
@@ -94,6 +101,7 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   dfs: 'O(V + E)',
   astar: 'O(E log V)',
   jps: 'O(E log V)',
+  theta: 'O(E log V)',
   'bidirectional-bfs': 'O(b^(d/2))',
   greedy: 'O(E log V)',
 };
@@ -147,8 +155,7 @@ interface ModeSnapshot {
   const [showStats, setShowStats]         = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
 
-  const jpsDiagonalConflict = selectedAlgo?.id === 'jps' && allowDiagonal;
-  const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating || jpsDiagonalConflict;
+  const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating;
   const isDark = theme === 'dark';
 
   const isAnimatingRef = useRef(false);
@@ -159,6 +166,17 @@ interface ModeSnapshot {
   useEffect(() => { dimensionsRef.current = dimensions; }, [dimensions]);
   useEffect(() => { speedRef.current = speed; }, [speed]);
   useEffect(() => { themeRef.current = theme; }, [theme]);
+
+  // Theta* requires 8-directional movement; JPS only supports 4-directional
+  // movement — auto-adjust diagonal mode whenever the selected algorithm
+  // changes to either of these.
+  useEffect(() => {
+    if (selectedAlgo?.id === 'theta') {
+      setAllowDiagonal(true);
+    } else if (selectedAlgo?.id === 'jps') {
+      setAllowDiagonal(false);
+    }
+  }, [selectedAlgo]);
 
   // Fetch grid
   useEffect(() => {
@@ -415,13 +433,6 @@ interface ModeSnapshot {
     setStatsPanelOpen(false);
 
     try {
-      if (selectedAlgo.id === 'jps' && allowDiagonal) {
-        setNoPathFound(false);
-        setInvalidPlacement(false);
-        setIsFetching(false);
-        return;
-      }
-
       const data: SolveResult = solver({
         grid,
         start: { row: startPoint.r, col: startPoint.c },
@@ -666,11 +677,17 @@ interface ModeSnapshot {
               {mazeMode === 'random' ? 'RANDOM' : 'MAZE'}
             </button>
 
-            {/* Diagonal movement toggle */}
+            {/* Diagonal movement toggle — locked ON while Theta* is selected, locked OFF while JPS is selected */}
             <button
               onClick={() => setAllowDiagonal((prev) => !prev)}
-              disabled={isAnimating}
-              title="Toggle 4-directional / 8-directional movement"
+              disabled={isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps'}
+              title={
+                selectedAlgo?.id === 'theta'
+                  ? 'Theta* requires 8-directional movement'
+                  : selectedAlgo?.id === 'jps'
+                  ? 'JPS only supports 4-directional movement'
+                  : 'Toggle 4-directional / 8-directional movement'
+              }
               aria-label="Toggle diagonal movement"
               style={{
                 height: '36px',
@@ -683,8 +700,8 @@ interface ModeSnapshot {
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: '0.05em',
-                cursor: isAnimating ? 'not-allowed' : 'pointer',
-                opacity: isAnimating ? 0.3 : 1,
+                cursor: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 'not-allowed' : 'pointer',
+                opacity: (isAnimating || selectedAlgo?.id === 'theta' || selectedAlgo?.id === 'jps') ? 0.3 : 1,
                 flexShrink: 0,
                 whiteSpace: 'nowrap',
               }}
@@ -989,20 +1006,6 @@ interface ModeSnapshot {
               )}
             </button>
           </div>
-
-          {jpsDiagonalConflict && (
-            <p
-              style={{
-                fontSize: '12px',
-                color: '#ff1744',
-                margin: 0,
-                fontFamily: 'inherit',
-              }}
-            >
-              JPS ONLY SUPPORTS 4-DIRECTIONAL MOVEMENT. SWITCH TO 4-DIR OR PICK A
-              DIFFERENT ALGORITHM.
-            </p>
-          )}
 
           {/* ── Speed slider + STOP — visible during animation only ── */}
           <AnimatePresence>
