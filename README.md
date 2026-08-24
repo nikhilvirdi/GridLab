@@ -74,7 +74,7 @@ Toggles whether algorithms can move diagonally instead of just up, down, left, a
 
 #### 4. Comparison Mode
 
-Runs two algorithms side by side on the exact same grid. Walls, start, and end stay perfectly synced between both sides no matter which one you paint on, so the comparison is actually fair. RUN BOTH fires both algorithms at once and turns into a STOP button while either is still animating. Reroll generates a fresh grid for both sides at once; Clear wipes the current run without touching the walls.
+Runs two algorithms side by side on the exact same grid. Walls, start, and end stay perfectly synced between both sides no matter which one you paint on, so the comparison is actually fair. RUN BOTH fires both algorithms at once and turns into a STOP button while either is still animating. Reroll generates a fresh grid for both sides at once; Clear wipes the current run without touching the walls. Both sides also can't have the same algorithm selected at once, so the comparison always shows two different approaches.
 
 #### 5. Reset, Reroll, and Speed
 
