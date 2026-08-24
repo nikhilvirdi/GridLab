@@ -11,12 +11,10 @@ GridLab is a mini project I built for my CSE 4th semester Design and Analysis of
 
 It started as a way to actually *see* the difference between BFS and A* instead of just reading about it in a textbook, and grew from there: seven algorithms instead of six, a corridor-based maze generator alongside the original random walls, five terrain biomes with their own movement costs and obstacle types, a diagonal-movement toggle, and a side-by-side comparison mode for running two algorithms on the same grid at once.
 
-<img width="1918" height="1026" alt="initial daashboard image" src="https://github.com/user-attachments/assets/a81e3c8b-7de9-41ae-9563-5131f706055a" />
-<img width="1918" height="1021" alt="volcano biome" src="https://github.com/user-attachments/assets/75fc231d-34d8-4f8d-a318-2ebde59558b0" />
-<img width="1917" height="1023" alt="maze" src="https://github.com/user-attachments/assets/fa435151-0790-483f-a169-8dcdb497d660" />
-<img width="1917" height="1026" alt="compare mode" src="https://github.com/user-attachments/assets/e8a8e301-7bd9-4cc4-ac19-669a7f845c63" />
-
-<!-- screenshot: comparison mode, two grids + middle stats panel -->
+<img width="1918" height="1026" alt="GridLab default dashboard view" src="https://github.com/user-attachments/assets/a81e3c8b-7de9-41ae-9563-5131f706055a" />
+<img width="1918" height="1021" alt="Volcanic biome with a completed pathfinding run" src="https://github.com/user-attachments/assets/75fc231d-34d8-4f8d-a318-2ebde59558b0" />
+<img width="1917" height="1023" alt="Maze mode showing generated corridors" src="https://github.com/user-attachments/assets/fa435151-0790-483f-a169-8dcdb497d660" />
+<img width="1917" height="1026" alt="Comparison mode with two grids and the split stats panel" src="https://github.com/user-attachments/assets/e8a8e301-7bd9-4cc4-ac19-669a7f845c63" />
 
 ## Algorithms
 
@@ -45,6 +43,18 @@ Seven algorithms, seven different ways of exploring the same grid.
 | Theta* | O(E log V) | Yes |
 | Bi-BFS | O(b^(d/2)) | Yes (unweighted grids) |
 | Greedy | O(E log V) | No |
+
+## Features
+
+**Random walls vs. Maze mode.** Random is the default — every cell independently has a 38% chance of being a wall, pure noise with no guaranteed structure. Maze mode swaps this for an actual recursive-backtracking generator that carves connected corridors instead of scattered noise, so runs look and behave completely differently: dead ends, winding routes, no random unreachable pockets.
+
+**Biomes.** Five themed terrains, each with its own movement cost and its own generation algorithm — not just a repainted version of the same noise. Plains lays down short winding river segments. Desert scatters individual cacti with zero clustering, so they read as sparse plants rather than clumps. Swamp and Volcanic both use cellular-automaton clustering (random fill, smoothed into organic blobs over a few passes) at different densities. Tundra grows glaciers with a directional flood-fill, so they come out as long winding ridges instead of round islands you can just walk around. Only A* and Theta* actually factor the biome's cost into their pathfinding — every other algorithm treats every open cell as equal, same as on Classic.
+
+**Diagonal movement (4-DIR / 8-DIR).** Toggles whether algorithms can move diagonally instead of just up/down/left/right. Corner-cutting is blocked — a diagonal step only works if both orthogonal cells around it are open, so a path can't clip through a wall's corner. JPS only supports 4-DIR and Theta* only makes sense in 8-DIR, so selecting either one auto-locks the toggle to whichever mode it needs.
+
+**Comparison mode.** Runs two algorithms side by side on the exact same grid — walls, start, and end stay perfectly synced between both sides no matter which one you paint on, so the comparison is actually fair. RUN BOTH fires both algorithms at once and turns into a STOP button while either is still animating. Reroll generates a fresh grid for both sides at once; Clear wipes the current run without touching the walls.
+
+**Reset, Reroll, and speed.** Reset (the eraser icon) clears the current run — path, visited nodes, stats — without touching the grid itself. Reroll generates an entirely new grid. The speed slider controls how fast the visualization animates, from a slow step-by-step crawl to near-instant.
 
 ## Tech Stack
 
