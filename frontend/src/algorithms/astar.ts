@@ -54,6 +54,12 @@ class MinHeap {
 const manhattan = (a: Point, b: Point): number =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 
+const chebyshev = (a: Point, b: Point): number =>
+  Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col));
+
+const heuristic = (a: Point, b: Point, allowDiagonal?: boolean): number =>
+  allowDiagonal ? chebyshev(a, b) : manhattan(a, b);
+
 /**
  * A* Search
  *
@@ -92,12 +98,17 @@ export function solveAStar(req: SolveRequest): SolveResult {
     return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
   }
 
-  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_8 = [
+    [-1, 0], [1, 0], [0, -1], [0, 1],
+    [-1, -1], [-1, 1], [1, -1], [1, 1]
+  ];
+  const dirs = req.allowDiagonal ? DIRS_8 : DIRS_4;
   const openSet = new MinHeap();
 
   gCost.set(srcKey, 0);
   parent.set(srcKey, null);
-  openSet.push(manhattan(src, dst), src);
+  openSet.push(heuristic(src, dst, req.allowDiagonal), src);
 
   let found = false;
 
@@ -117,7 +128,7 @@ export function solveAStar(req: SolveRequest): SolveResult {
 
     const g = gCost.get(currKey)!;
 
-    for (const [dr, dc] of DIRS) {
+    for (const [dr, dc] of dirs) {
       const nr = curr.row + dr;
       const nc = curr.col + dc;
       const nk = key(nr, nc);
@@ -129,13 +140,19 @@ export function solveAStar(req: SolveRequest): SolveResult {
         closed.has(nk)
       ) continue;
 
+      if (dr !== 0 && dc !== 0) {
+        const orth1Open = grid[curr.row + dr]?.[curr.col] === 0;
+        const orth2Open = grid[curr.row]?.[curr.col + dc] === 0;
+        if (!orth1Open || !orth2Open) continue;
+      }
+
       const newG = g + 1;
       const existingG = gCost.get(nk) ?? Infinity;
 
       if (newG < existingG) {
         gCost.set(nk, newG);
         parent.set(nk, currKey);
-        const f = newG + manhattan({ row: nr, col: nc }, dst);
+        const f = newG + heuristic({ row: nr, col: nc }, dst, req.allowDiagonal);
         openSet.push(f, { row: nr, col: nc });
       }
     }

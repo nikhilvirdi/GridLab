@@ -37,7 +37,12 @@ export function solveBidirectionalBFS(req: SolveRequest): SolveResult {
     return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
   }
 
-  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_8 = [
+    [-1, 0], [1, 0], [0, -1], [0, 1],
+    [-1, -1], [-1, 1], [1, -1], [1, 1]
+  ];
+  const dirs = req.allowDiagonal ? DIRS_8 : DIRS_4;
 
   // Forward and backward parent maps — null means "this is the frontier origin"
   const parentFwd = new Map<string, string | null>([[srcKey, null]]);
@@ -69,7 +74,7 @@ export function solveBidirectionalBFS(req: SolveRequest): SolveResult {
       const curr = queue[head.value++];
       const currKey = key(curr.row, curr.col);
 
-      for (const [dr, dc] of DIRS) {
+      for (const [dr, dc] of dirs) {
         const nr = curr.row + dr;
         const nc = curr.col + dc;
         const nk = key(nr, nc);
@@ -80,6 +85,12 @@ export function solveBidirectionalBFS(req: SolveRequest): SolveResult {
           grid[nr][nc] === 1 ||
           ownParent.has(nk)
         ) continue;
+
+        if (dr !== 0 && dc !== 0) {
+          const orth1Open = grid[curr.row + dr]?.[curr.col] === 0;
+          const orth2Open = grid[curr.row]?.[curr.col + dc] === 0;
+          if (!orth1Open || !orth2Open) continue;
+        }
 
         ownParent.set(nk, currKey);
 

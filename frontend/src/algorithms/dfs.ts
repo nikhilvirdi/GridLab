@@ -33,7 +33,12 @@ export function solveDFS(req: SolveRequest): SolveResult {
     return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
   }
 
-  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_8 = [
+    [-1, 0], [1, 0], [0, -1], [0, 1],
+    [-1, -1], [-1, 1], [1, -1], [1, 1]
+  ];
+  const dirs = req.allowDiagonal ? DIRS_8 : DIRS_4;
   const stack: Point[] = [src];
   const visited = new Set<string>();
   parent.set(srcKey, null);
@@ -54,7 +59,7 @@ export function solveDFS(req: SolveRequest): SolveResult {
       break;
     }
 
-    for (const [dr, dc] of DIRS) {
+    for (const [dr, dc] of dirs) {
       const nr = curr.row + dr;
       const nc = curr.col + dc;
       const nk = key(nr, nc);
@@ -65,6 +70,11 @@ export function solveDFS(req: SolveRequest): SolveResult {
         grid[nr][nc] === 0 &&
         !visited.has(nk)
       ) {
+        if (dr !== 0 && dc !== 0) {
+          const orth1Open = grid[curr.row + dr]?.[curr.col] === 0;
+          const orth2Open = grid[curr.row]?.[curr.col + dc] === 0;
+          if (!orth1Open || !orth2Open) continue;
+        }
         // Only set parent on first discovery
         if (!parent.has(nk)) {
           parent.set(nk, currKey);

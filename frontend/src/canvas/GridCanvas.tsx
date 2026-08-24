@@ -43,7 +43,7 @@ interface AlgorithmOption {
 
 const ALGO_SOLVERS: Record<
   string,
-  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint }) => SolveResult
+  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint; allowDiagonal?: boolean }) => SolveResult
 > = {
   bfs: solveBFS,
   dfs: solveDFS,
@@ -122,6 +122,7 @@ interface ModeSnapshot {
   // Grid state
   const [grid, setGrid]           = useState<number[][]>([]);
   const [mazeMode, setMazeMode] = useState<'random' | 'corridor'>('random');
+  const [allowDiagonal, setAllowDiagonal] = useState(false);
   const [inactiveSnapshot, setInactiveSnapshot] = useState<ModeSnapshot | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
@@ -146,7 +147,8 @@ interface ModeSnapshot {
   const [showStats, setShowStats]         = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
 
-  const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating;
+  const jpsDiagonalConflict = selectedAlgo?.id === 'jps' && allowDiagonal;
+  const isRunDisabled = !startPoint || !endPoint || !selectedAlgo || isFetching || isAnimating || jpsDiagonalConflict;
   const isDark = theme === 'dark';
 
   const isAnimatingRef = useRef(false);
@@ -413,10 +415,18 @@ interface ModeSnapshot {
     setStatsPanelOpen(false);
 
     try {
+      if (selectedAlgo.id === 'jps' && allowDiagonal) {
+        setNoPathFound(false);
+        setInvalidPlacement(false);
+        setIsFetching(false);
+        return;
+      }
+
       const data: SolveResult = solver({
         grid,
         start: { row: startPoint.r, col: startPoint.c },
         end:   { row: endPoint.r,   col: endPoint.c   },
+        allowDiagonal,
       });
 
       if (data.visitedNodes.length === 0 && data.path.length === 0 && data.nodesVisited === 0) {
@@ -656,11 +666,37 @@ interface ModeSnapshot {
               {mazeMode === 'random' ? 'RANDOM' : 'MAZE'}
             </button>
 
-            {/* Terrain dropdown placeholder — visually present, non-functional, disabled.
+            {/* Diagonal movement toggle */}
+            <button
+              onClick={() => setAllowDiagonal((prev) => !prev)}
+              disabled={isAnimating}
+              title="Toggle 4-directional / 8-directional movement"
+              aria-label="Toggle diagonal movement"
+              style={{
+                height: '36px',
+                padding: '0 14px',
+                borderRadius: '8px',
+                backgroundColor: panelBg,
+                border: `2px solid ${borderColor}`,
+                color: isDark ? '#ffffff' : '#000000',
+                fontFamily: 'inherit',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+                cursor: isAnimating ? 'not-allowed' : 'pointer',
+                opacity: isAnimating ? 0.3 : 1,
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {allowDiagonal ? '8-DIR' : '4-DIR'}
+            </button>
+
+            {/* Theme dropdown placeholder — visually present, non-functional, disabled.
                 This is a future feature slot, not wired to anything yet. */}
             <button
               disabled
-              title="Terrain — coming soon"
+              title="Theme — coming soon"
               style={{
                 flex: 1,
                 height: '36px',
@@ -679,7 +715,7 @@ interface ModeSnapshot {
                 justifyContent: 'center',
               }}
             >
-              TERRAIN
+              THEME
             </button>
 
             {/* Reroll button — regenerates only the active mode's grid */}
@@ -953,6 +989,20 @@ interface ModeSnapshot {
               )}
             </button>
           </div>
+
+          {jpsDiagonalConflict && (
+            <p
+              style={{
+                fontSize: '12px',
+                color: '#ff1744',
+                margin: 0,
+                fontFamily: 'inherit',
+              }}
+            >
+              JPS ONLY SUPPORTS 4-DIRECTIONAL MOVEMENT. SWITCH TO 4-DIR OR PICK A
+              DIFFERENT ALGORITHM.
+            </p>
+          )}
 
           {/* ── Speed slider + STOP — visible during animation only ── */}
           <AnimatePresence>

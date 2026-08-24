@@ -9,6 +9,10 @@ export interface SolveRequest {
   grid: number[][];
   start: Point;
   end: Point;
+  /** When true, allows 8-directional (diagonal) movement. Defaults to false
+   *  (4-directional) if omitted. Not supported by JPS — callers must not
+   *  invoke solveJPS with this set to true. */
+  allowDiagonal?: boolean;
 }
 
 /** Response returned by each /api/solve/* endpoint. */

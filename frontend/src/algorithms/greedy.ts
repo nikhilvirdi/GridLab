@@ -46,6 +46,12 @@ class MinHeap {
 const manhattan = (a: Point, b: Point): number =>
   Math.abs(a.row - b.row) + Math.abs(a.col - b.col);
 
+const chebyshev = (a: Point, b: Point): number =>
+  Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col));
+
+const heuristic = (a: Point, b: Point, allowDiagonal?: boolean): number =>
+  allowDiagonal ? chebyshev(a, b) : manhattan(a, b);
+
 /**
  * Greedy Best-First Search
  *
@@ -82,11 +88,16 @@ export function solveGreedy(req: SolveRequest): SolveResult {
     return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
   }
 
-  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_8 = [
+    [-1, 0], [1, 0], [0, -1], [0, 1],
+    [-1, -1], [-1, 1], [1, -1], [1, 1]
+  ];
+  const dirs = req.allowDiagonal ? DIRS_8 : DIRS_4;
   const openSet = new MinHeap();
 
   parent.set(srcKey, null);
-  openSet.push(manhattan(src, dst), src);
+  openSet.push(heuristic(src, dst, req.allowDiagonal), src);
 
   let found = false;
 
@@ -104,7 +115,7 @@ export function solveGreedy(req: SolveRequest): SolveResult {
       break;
     }
 
-    for (const [dr, dc] of DIRS) {
+    for (const [dr, dc] of dirs) {
       const nr = curr.row + dr;
       const nc = curr.col + dc;
       const nk = key(nr, nc);
@@ -116,11 +127,17 @@ export function solveGreedy(req: SolveRequest): SolveResult {
         closed.has(nk)
       ) continue;
 
+      if (dr !== 0 && dc !== 0) {
+        const orth1Open = grid[curr.row + dr]?.[curr.col] === 0;
+        const orth2Open = grid[curr.row]?.[curr.col + dc] === 0;
+        if (!orth1Open || !orth2Open) continue;
+      }
+
       // Greedy: only track first discovery — no g-cost comparison
       if (!parent.has(nk)) {
         parent.set(nk, currKey);
         // Priority = heuristic only, no g(n)
-        openSet.push(manhattan({ row: nr, col: nc }, dst), { row: nr, col: nc });
+        openSet.push(heuristic({ row: nr, col: nc }, dst, req.allowDiagonal), { row: nr, col: nc });
       }
     }
   }

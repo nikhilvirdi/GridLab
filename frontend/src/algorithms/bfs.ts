@@ -33,7 +33,12 @@ export function solveBFS(req: SolveRequest): SolveResult {
     return { visitedNodes: [], path: [], nodesVisited: 0, pathLength: 0, timeTaken };
   }
 
-  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const DIRS_8 = [
+    [-1, 0], [1, 0], [0, -1], [0, 1],
+    [-1, -1], [-1, 1], [1, -1], [1, 1]
+  ];
+  const dirs = req.allowDiagonal ? DIRS_8 : DIRS_4;
   const queue: Point[] = [src];
   let head = 0; // two-pointer head index — O(1) dequeue
   parent.set(srcKey, null);
@@ -50,7 +55,7 @@ export function solveBFS(req: SolveRequest): SolveResult {
       break;
     }
 
-    for (const [dr, dc] of DIRS) {
+    for (const [dr, dc] of dirs) {
       const nr = curr.row + dr;
       const nc = curr.col + dc;
       const nk = key(nr, nc);
@@ -61,6 +66,13 @@ export function solveBFS(req: SolveRequest): SolveResult {
         grid[nr][nc] === 0 &&
         !parent.has(nk)
       ) {
+        // Block diagonal corner-cutting: both orthogonal cells adjacent
+        // to a diagonal move must be open.
+        if (dr !== 0 && dc !== 0) {
+          const orth1Open = grid[curr.row + dr]?.[curr.col] === 0;
+          const orth2Open = grid[curr.row]?.[curr.col + dc] === 0;
+          if (!orth1Open || !orth2Open) continue;
+        }
         parent.set(nk, currKey);
         visitedNodes.push({ row: nr, col: nc });
         queue.push({ row: nr, col: nc });
