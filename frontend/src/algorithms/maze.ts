@@ -91,3 +91,146 @@ export function generateCorridorMaze(N: number): number[][] {
 
   return grid;
 }
+
+/**
+ * Generates an N x N grid with naturally clustered terrain instead of
+ * uniform random noise, using a cellular-automaton smoothing pass (a
+ * standard technique for organic cave/terrain generation). Starts with
+ * independent random cells at `density` probability, then applies
+ * `iterations` rounds of smoothing: each cell's next state depends on how
+ * many of its 8 neighbors are currently obstacles (5 or more neighbors ->
+ * becomes/stays an obstacle, fewer -> becomes/stays open). This causes
+ * scattered noise to coalesce into organic blobs (dunes, ponds, glaciers,
+ * lava pools) instead of salt-and-pepper static.
+ *
+ * With iterations = 0, this reduces to plain random noise at the given
+ * density — used for sparse, non-clustered obstacles (e.g. desert cacti,
+ * which should look like individual scattered plants, not clumps).
+ *
+ * Like generateMaze, this does not guarantee connectivity between any
+ * two cells — the app already handles the "no path found" case.
+ *
+ * Returns a 2D array where 0 = open cell and 1 = obstacle cell, matching
+ * the same format as generateMaze and generateCorridorMaze.
+ */
+export function generateClusteredTerrain(N: number, density: number, iterations: number): number[][] {
+  if (N <= 0) return [];
+
+  let grid: number[][] = Array.from({ length: N }, () =>
+    Array.from({ length: N }, () => (Math.random() < density ? 1 : 0))
+  );
+
+  const countObstacleNeighbors = (g: number[][], r: number, c: number): number => {
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = r + dr, nc = c + dc;
+        if (nr < 0 || nr >= N || nc < 0 || nc >= N) {
+          count++; // treat out-of-bounds as obstacle — keeps clusters from bleeding oddly at edges
+        } else if (g[nr][nc] === 1) {
+          count++;
+        }
+      }
+    }
+    return count;
+  };
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const next: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        next[r][c] = countObstacleNeighbors(grid, r, c) >= 5 ? 1 : 0;
+      }
+    }
+    grid = next;
+  }
+
+  return grid;
+}
+
+/**
+ * Generates an N x N grid with a handful of winding "river" paths of
+ * water cutting across the grid from top to bottom, instead of blobby
+ * clustered ponds. Each river does a constrained random walk: at every
+ * row, its center column drifts by -1, 0, or +1, and a band of `width`
+ * cells around that center is marked as water. This produces natural
+ * snaking river shapes rather than round lake-like blobs.
+ *
+ * Returns a 2D array where 0 = open land and 1 = water (obstacle).
+ */
+export function generateRiverTerrain(N: number, riverCount: number, width: number): number[][] {
+  if (N <= 0) return [];
+
+  const grid: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
+  const halfWidth = Math.floor(width / 2);
+
+  for (let i = 0; i < riverCount; i++) {
+    let col = Math.floor(Math.random() * N);
+    for (let row = 0; row < N; row++) {
+      col += Math.floor(Math.random() * 3) - 1; // drift -1, 0, or +1
+      col = Math.max(0, Math.min(N - 1, col));
+      for (let dc = -halfWidth; dc <= halfWidth; dc++) {
+        const c = col + dc;
+        if (c >= 0 && c < N) grid[row][c] = 1;
+      }
+    }
+  }
+
+  return grid;
+}
+
+/**
+ * Generates an N x N grid with a small number of large, solid blob
+ * shapes ("glaciers") instead of many small scattered clusters. Each
+ * blob is grown from a random seed cell via randomized flood-fill: at
+ * each growth step, a random cell already in the blob's frontier expands
+ * into one of its unvisited neighbors, until the blob reaches a random
+ * target size between blobMinSize and blobMaxSize. This produces a
+ * handful of large, organically-shaped solid regions rather than the
+ * many-small-clumps look of cellular-automaton smoothing.
+ *
+ * Returns a 2D array where 0 = open ground and 1 = glacier (obstacle).
+ */
+export function generateGlacierTerrain(
+  N: number, blobCount: number, blobMinSize: number, blobMaxSize: number
+): number[][] {
+  if (N <= 0) return [];
+
+  const grid: number[][] = Array.from({ length: N }, () => Array(N).fill(0));
+  const DIRS = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+  for (let b = 0; b < blobCount; b++) {
+    const targetSize = blobMinSize + Math.floor(Math.random() * (blobMaxSize - blobMinSize + 1));
+    const startR = Math.floor(Math.random() * N);
+    const startC = Math.floor(Math.random() * N);
+
+    const visited = new Set<string>([`${startR},${startC}`]);
+    grid[startR][startC] = 1;
+    const frontier: [number, number][] = [[startR, startC]];
+    let count = 1;
+
+    // Safety cap prevents an unlucky frontier (fully boxed-in) from
+    // looping forever without reaching targetSize.
+    let attempts = 0;
+    const maxAttempts = targetSize * 30;
+
+    while (count < targetSize && frontier.length > 0 && attempts < maxAttempts) {
+      attempts++;
+      const idx = Math.floor(Math.random() * frontier.length);
+      const [r, c] = frontier[idx];
+      const [dr, dc] = DIRS[Math.floor(Math.random() * DIRS.length)];
+      const nr = r + dr, nc = c + dc;
+      const key = `${nr},${nc}`;
+
+      if (nr >= 0 && nr < N && nc >= 0 && nc < N && !visited.has(key)) {
+        visited.add(key);
+        grid[nr][nc] = 1;
+        frontier.push([nr, nc]);
+        count++;
+      }
+    }
+  }
+
+  return grid;
+}

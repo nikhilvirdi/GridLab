@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import LoaderOne from '../components/LoaderOne';
-import { generateMaze, generateCorridorMaze } from '../algorithms/maze';
+import { generateMaze, generateCorridorMaze, generateClusteredTerrain, generateRiverTerrain, generateGlacierTerrain } from '../algorithms/maze';
 import { solveBFS } from '../algorithms/bfs';
 import { solveDFS } from '../algorithms/dfs';
 import { solveAStar } from '../algorithms/astar';
@@ -9,6 +9,7 @@ import { solveJPS } from '../algorithms/jps';
 import { solveThetaStar } from '../algorithms/theta';
 import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
 import { solveGreedy } from '../algorithms/greedy';
+import { BIOME_LIST, BIOME_MAP, type BiomeId } from '../algorithms/biomes';
 
 interface Point {
   r: number;
@@ -44,7 +45,7 @@ interface AlgorithmOption {
 
 const ALGO_SOLVERS: Record<
   string,
-  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint; allowDiagonal?: boolean }) => SolveResult
+  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint; allowDiagonal?: boolean; stepCost?: number }) => SolveResult
 > = {
   bfs: solveBFS,
   dfs: solveDFS,
@@ -106,12 +107,45 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   greedy: 'O(E log V)',
 };
 
+/**
+ * Picks the correct grid generator based on mode and active biome:
+ * - Corridor/Maze mode always uses generateCorridorMaze, regardless of
+ *   biome — it already has real connected-corridor structure.
+ * - Random mode with Classic biome uses the original generateMaze
+ *   (unchanged default behavior).
+ * - Random mode with any other biome uses the clustered terrain
+ *   generator, tuned per biome via terrainDensity/terrainIterations.
+ */
+const generateGridForMode = (
+  mode: 'random' | 'corridor',
+  gridSize: number,
+  biome: BiomeId
+): number[][] => {
+  if (mode === 'corridor') return generateCorridorMaze(gridSize);
+  if (biome === 'classic') return generateMaze(gridSize);
+
+  const config = BIOME_MAP[biome];
+  switch (config.terrainType) {
+    case 'noise':
+      return generateClusteredTerrain(gridSize, config.density ?? 0.1, 0);
+    case 'clustered':
+      return generateClusteredTerrain(gridSize, config.density ?? 0.3, config.iterations ?? 3);
+    case 'river':
+      return generateRiverTerrain(gridSize, config.riverCount ?? 3, config.riverWidth ?? 3);
+    case 'glacier':
+      return generateGlacierTerrain(gridSize, config.blobCount ?? 8, config.blobMinSize ?? 60, config.blobMaxSize ?? 180);
+    default:
+      return generateClusteredTerrain(gridSize, 0.3, 3);
+  }
+};
+
 const GRID_PX = 480;
 
 export const GridCanvas: React.FC<GridCanvasProps> = ({ size = 50, theme = 'dark' }) => {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
+  const biomeDropdownRef = useRef<HTMLDivElement>(null);
   const animStopRef   = useRef(false);
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
@@ -131,6 +165,8 @@ interface ModeSnapshot {
   const [grid, setGrid]           = useState<number[][]>([]);
   const [mazeMode, setMazeMode] = useState<'random' | 'corridor'>('random');
   const [allowDiagonal, setAllowDiagonal] = useState(false);
+  const [activeBiome, setActiveBiome] = useState<BiomeId>('classic');
+  const [isBiomeDropdownOpen, setIsBiomeDropdownOpen] = useState(false);
   const [inactiveSnapshot, setInactiveSnapshot] = useState<ModeSnapshot | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
@@ -193,7 +229,7 @@ interface ModeSnapshot {
     setInvalidPlacement(false);
 
     try {
-      const newGrid = mazeMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
+      const newGrid = generateGridForMode(mazeMode, size, activeBiome);
       if (active) {
         setGrid(newGrid);
         setLoading(false);
@@ -241,7 +277,7 @@ interface ModeSnapshot {
       setNoPathFound(false);
       setInvalidPlacement(false);
       try {
-        const newGrid = targetMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
+        const newGrid = generateGridForMode(targetMode, size, activeBiome);
         setGrid(newGrid);
         setLoading(false);
       } catch (err: any) {
@@ -264,7 +300,7 @@ interface ModeSnapshot {
     setNoPathFound(false);
     setInvalidPlacement(false);
     try {
-      const newGrid = mazeMode === 'corridor' ? generateCorridorMaze(size) : generateMaze(size);
+      const newGrid = generateGridForMode(mazeMode, size, activeBiome);
       setGrid(newGrid);
       setLoading(false);
     } catch (err: any) {
@@ -273,11 +309,48 @@ interface ModeSnapshot {
     }
   };
 
+  // Switching biomes doesn't touch grid/walls/start/end — only recolors the
+  // grid and changes movement cost. Any completed run's results are cleared
+  // since they were computed under the previous biome's cost model, in both
+  // the live state and the inactive mode's stored snapshot (so a later mode
+  // switch doesn't restore a stale, biome-mismatched run).
+  const handleBiomeChange = (biome: BiomeId) => {
+    if (biome === activeBiome || isAnimating) return;
+    setActiveBiome(biome);
+    setSolveResult(null);
+    setShowStats(false);
+    setStatsPanelOpen(false);
+    setNoPathFound(false);
+    setInvalidPlacement(false);
+    setInactiveSnapshot((prev) =>
+      prev
+        ? {
+            ...prev,
+            solveResult: null,
+            showStats: false,
+            statsPanelOpen: false,
+            noPathFound: false,
+            invalidPlacement: false,
+          }
+        : prev
+    );
+  };
+
   // Close dropdown on outside click
   useEffect(() => {
     const fn = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
         setIsDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, []);
+
+  // Close biome dropdown on outside click
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (biomeDropdownRef.current && !biomeDropdownRef.current.contains(e.target as Node))
+        setIsBiomeDropdownOpen(false);
     };
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
@@ -438,6 +511,7 @@ interface ModeSnapshot {
         start: { row: startPoint.r, col: startPoint.c },
         end:   { row: endPoint.r,   col: endPoint.c   },
         allowDiagonal,
+        stepCost: BIOME_MAP[activeBiome].cost,
       });
 
       if (data.visitedNodes.length === 0 && data.path.length === 0 && data.nodesVisited === 0) {
@@ -493,8 +567,9 @@ interface ModeSnapshot {
       return;
     }
 
-    const wallColor = theme === 'dark' ? '#111111' : '#1e293b';
-    const openColor = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+    const biomeConfig = BIOME_MAP[activeBiome];
+    const wallColor = theme === 'dark' ? biomeConfig.wallDark : biomeConfig.wallLight;
+    const openColor = theme === 'dark' ? biomeConfig.openDark : biomeConfig.openLight;
 
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
@@ -565,7 +640,7 @@ interface ModeSnapshot {
     } else {
       drawBaseGrid();
     }
-  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme]);
+  }, [grid, dimensions, size, loading, error, startPoint, endPoint, isAnimating, solveResult, theme, activeBiome]);
 
   // ─── Styling tokens ───────────────────────────────────────────────────────
   const borderColor  = isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
@@ -709,31 +784,127 @@ interface ModeSnapshot {
               {allowDiagonal ? '8-DIR' : '4-DIR'}
             </button>
 
-            {/* Theme dropdown placeholder — visually present, non-functional, disabled.
-                This is a future feature slot, not wired to anything yet. */}
-            <button
-              disabled
-              title="Theme — coming soon"
-              style={{
-                flex: 1,
-                height: '36px',
-                borderRadius: '8px',
-                backgroundColor: panelBg,
-                border: `2px solid ${borderColor}`,
-                color: isDark ? '#555555' : '#999999',
-                fontFamily: 'inherit',
-                fontSize: '12px',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-                cursor: 'not-allowed',
-                opacity: 0.4,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              THEME
-            </button>
+            {/* Biome dropdown — selects grid terrain theme and movement cost */}
+            <div ref={biomeDropdownRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <button
+                onClick={() => setIsBiomeDropdownOpen((prev) => !prev)}
+                disabled={isAnimating}
+                title="Select terrain biome"
+                aria-label="Select terrain biome"
+                style={{
+                  width: '100%',
+                  height: '36px',
+                  borderRadius: '8px',
+                  backgroundColor: panelBg,
+                  border: `2px solid ${borderColor}`,
+                  color: isDark ? '#ffffff' : '#000000',
+                  fontFamily: 'inherit',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.05em',
+                  cursor: isAnimating ? 'not-allowed' : 'pointer',
+                  opacity: isAnimating ? 0.3 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0 12px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <span>{BIOME_MAP[activeBiome].label}</span>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={isDark ? '#ffffff' : '#000000'}
+                  strokeWidth="2"
+                  style={{
+                    flexShrink: 0,
+                    marginLeft: '6px',
+                    transform: isBiomeDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {/* Biome list — opens upward since this row sits near the bottom of the grid */}
+              <AnimatePresence>
+                {isBiomeDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
+                    style={{
+                      position: 'absolute',
+                      bottom: '100%',
+                      marginBottom: '8px',
+                      left: 0,
+                      width: '180px',
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      borderRadius: '10px',
+                      backgroundColor: panelBg,
+                      border: `2px solid ${borderColor}`,
+                      boxShadow: isDark ? '0 -10px 30px rgba(0,0,0,0.6)' : '0 -10px 30px rgba(0,0,0,0.1)',
+                      zIndex: 100,
+                    }}
+                  >
+                    {BIOME_LIST.map((biome, idx) => (
+                      <button
+                        key={biome.id}
+                        onClick={() => {
+                          handleBiomeChange(biome.id);
+                          setIsBiomeDropdownOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 14px',
+                          backgroundColor: panelBg,
+                          border: 'none',
+                          borderBottom:
+                            idx < BIOME_LIST.length - 1
+                              ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                              : 'none',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '12px',
+                          color:
+                            activeBiome === biome.id
+                              ? isDark ? '#ffffff' : '#000000'
+                              : isDark ? '#cccccc' : '#000000',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = panelBg;
+                        }}
+                      >
+                        <span>{biome.label}</span>
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            letterSpacing: '0.05em',
+                            color: isDark ? '#888888' : '#555555',
+                          }}
+                        >
+                          ×{biome.cost}
+                        </span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             {/* Reroll button — regenerates only the active mode's grid */}
             <button

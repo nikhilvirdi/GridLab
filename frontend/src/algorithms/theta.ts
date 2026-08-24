@@ -209,23 +209,25 @@ export function solveThetaStar(req: SolveRequest): SolveResult {
 
       const neighbor: Point = { row: nr, col: nc };
 
+      const stepCost = req.stepCost ?? 1;
+
       if (hasLineOfSight(grid, rows, cols, parentPoint, neighbor)) {
         // Path 2: shortcut directly from the grandparent, skipping `curr`.
-        const newG = gCost.get(parentKey)! + euclidean(parentPoint, neighbor);
+        const newG = gCost.get(parentKey)! + euclidean(parentPoint, neighbor) * stepCost;
         const existingG = gCost.get(nk) ?? Infinity;
         if (newG < existingG) {
           gCost.set(nk, newG);
           parent.set(nk, parentKey);
-          openSet.push(newG + euclidean(neighbor, dst), neighbor);
+          openSet.push(newG + euclidean(neighbor, dst) * stepCost, neighbor);
         }
       } else {
         // Path 1: standard A*-style update through `curr`.
-        const newG = gCost.get(currKey)! + euclidean(curr, neighbor);
+        const newG = gCost.get(currKey)! + euclidean(curr, neighbor) * stepCost;
         const existingG = gCost.get(nk) ?? Infinity;
         if (newG < existingG) {
           gCost.set(nk, newG);
           parent.set(nk, currKey);
-          openSet.push(newG + euclidean(neighbor, dst), neighbor);
+          openSet.push(newG + euclidean(neighbor, dst) * stepCost, neighbor);
         }
       }
     }

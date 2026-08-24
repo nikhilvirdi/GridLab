@@ -146,7 +146,7 @@ export function solveAStar(req: SolveRequest): SolveResult {
         if (!orth1Open || !orth2Open) continue;
       }
 
-      const newG = g + 1;
+      const newG = g + (req.stepCost ?? 1);
       const existingG = gCost.get(nk) ?? Infinity;
 
       if (newG < existingG) {

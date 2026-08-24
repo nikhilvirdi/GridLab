@@ -13,6 +13,10 @@ export interface SolveRequest {
    *  (4-directional) if omitted. Not supported by JPS — callers must not
    *  invoke solveJPS with this set to true. */
   allowDiagonal?: boolean;
+  /** Movement cost per step, set by the active biome. Defaults to 1 if
+   *  omitted. Only respected by algorithms that track real accumulated
+   *  path cost (A*, Theta*) — all other algorithms ignore this field. */
+  stepCost?: number;
 }
 
 /** Response returned by each /api/solve/* endpoint. */
