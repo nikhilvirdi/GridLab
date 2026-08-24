@@ -184,6 +184,7 @@ function App() {
           onGridGenerated={setSharedGrid}
           onStartPointChange={setSharedStart}
           onEndPointChange={setSharedEnd}
+          disabledAlgoName={rightAlgo}
           externalSpeed={sharedSpeed}
           onSolveResultChange={(result, complexity) => { setLeftResult(result); setLeftComplexity(complexity); }}
           onSelectedAlgoChange={setLeftAlgo}
@@ -206,26 +207,31 @@ function App() {
         >
           <button
             onClick={() => {
-              leftRef.current?.run();
-              rightRef.current?.run();
+              if (leftBusy || rightBusy) {
+                leftRef.current?.stop();
+                rightRef.current?.stop();
+              } else {
+                leftRef.current?.run();
+                rightRef.current?.run();
+              }
             }}
-            disabled={leftBusy || rightBusy}
+            disabled={!leftBusy && !rightBusy && (!leftAlgo || !rightAlgo)}
             style={{
               width: '100%',
               height: '48px',
               borderRadius: '10px',
-              border: '2px solid #00e676',
+              border: (leftBusy || rightBusy) ? '2px solid #ff1744' : '2px solid #00e676',
               backgroundColor: 'transparent',
-              color: '#00e676',
+              color: (leftBusy || rightBusy) ? '#ff1744' : '#00e676',
               fontFamily: 'inherit',
               fontSize: '14px',
               fontWeight: 700,
               letterSpacing: '0.05em',
-              cursor: (leftBusy || rightBusy) ? 'not-allowed' : 'pointer',
-              opacity: (leftBusy || rightBusy) ? 0.4 : 1,
+              cursor: (!leftBusy && !rightBusy && (!leftAlgo || !rightAlgo)) ? 'not-allowed' : 'pointer',
+              opacity: (!leftBusy && !rightBusy && (!leftAlgo || !rightAlgo)) ? 0.4 : 1,
             }}
           >
-            RUN BOTH
+            {(leftBusy || rightBusy) ? 'STOP' : 'RUN BOTH'}
           </button>
 
           <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
@@ -329,6 +335,7 @@ function App() {
           onGridGenerated={setSharedGrid}
           onStartPointChange={setSharedStart}
           onEndPointChange={setSharedEnd}
+          disabledAlgoName={leftAlgo}
           externalSpeed={sharedSpeed}
           onSolveResultChange={(result, complexity) => { setRightResult(result); setRightComplexity(complexity); }}
           onSelectedAlgoChange={setRightAlgo}

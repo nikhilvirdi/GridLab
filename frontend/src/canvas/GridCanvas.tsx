@@ -35,6 +35,7 @@ export interface GridCanvasHandle {
   run: () => void;
   clear: () => void;
   reroll: () => void;
+  stop: () => void;
 }
 
 interface GridCanvasProps {
@@ -51,6 +52,7 @@ interface GridCanvasProps {
   onSolveResultChange?: (result: SolveResult | null, complexity: string | null) => void;
   onSelectedAlgoChange?: (algoName: string | null) => void;
   onBusyChange?: (busy: boolean) => void;
+  disabledAlgoName?: string | null;
 }
 
 interface AlgorithmOption {
@@ -114,7 +116,6 @@ const ALGORITHMS: AlgorithmOption[] = [
 ];
 
 const SPEED_DELAY = [80, 45, 20, 10, 4];
-const PATH_DELAY = 30;
 
 const ALGO_COMPLEXITY: Record<string, string> = {
   bfs: 'O(V + E)',
@@ -179,6 +180,7 @@ export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function
   size = 50,
   theme = 'dark',
   compareMode = false,
+  disabledAlgoName,
   externalGrid,
   externalStartPoint,
   externalEndPoint,
@@ -196,6 +198,7 @@ export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function
   const biomeDropdownRef = useRef<HTMLDivElement>(null);
   const animStopRef   = useRef(false);
   const stoppedEarlyRef = useRef(false);
+  const runCompletedRef = useRef(false);
   const sizeRef       = useRef(size);
   useEffect(() => { sizeRef.current = size; }, [size]);
 
@@ -319,7 +322,7 @@ interface ModeSnapshot {
   }, [selectedAlgo, compareMode]);
 
   useEffect(() => {
-    if (compareMode && onSolveResultChange && !isAnimating) {
+    if (compareMode && onSolveResultChange && !isAnimating && runCompletedRef.current) {
       const complexity = solveResult && selectedAlgo
         ? ALGO_COMPLEXITY[selectedAlgo.id] ?? null
         : null;
@@ -581,6 +584,7 @@ interface ModeSnapshot {
       if (i >= data.visitedNodes.length) {
         if (data.path.length === 0) {
           setNoPathFound(true);
+          runCompletedRef.current = true;
           isAnimatingRef.current = false;
           setIsAnimating(false);
           setShowStats(true);
@@ -611,6 +615,7 @@ interface ModeSnapshot {
       if (i >= data.path.length) {
         paintCell(start.r, start.c, markerColors.start);
         paintCell(end.r,   end.c,   markerColors.end);
+        runCompletedRef.current = true;
         isAnimatingRef.current = false;
         setIsAnimating(false);
         setShowStats(true);
@@ -625,7 +630,8 @@ interface ModeSnapshot {
         paintCell(row, col, markerColors.path);
       }
 
-      setTimeout(() => animatePath(i + 1), PATH_DELAY);
+      const pathDelay = SPEED_DELAY[speedRef.current];
+      setTimeout(() => animatePath(i + 1), pathDelay);
     };
 
     setTimeout(() => animateVisited(0), 50);
@@ -645,6 +651,7 @@ interface ModeSnapshot {
     if (!solver) return;
 
     stoppedEarlyRef.current = false;
+    runCompletedRef.current = false;
     setIsFetching(true);
     setNoPathFound(false);
     setInvalidPlacement(false);
@@ -681,12 +688,13 @@ interface ModeSnapshot {
     }
   };
 
-  // Imperative handle — exposes run/clear/reroll to parent via ref (placed after all three handlers are declared)
+  // Imperative handle — exposes run/clear/reroll/stop to parent via ref
   useImperativeHandle(ref, () => ({
     run: () => { handleRun(); },
     clear: () => { handleReset(); },
     reroll: () => { handleReroll(); },
-  }), [handleRun, handleReset, handleReroll]);
+    stop: () => { handleStop(); },
+  }), [handleRun, handleReset, handleReroll, handleStop]);
 
   // Draw base grid
   const drawBaseGrid = () => {
@@ -895,53 +903,60 @@ interface ModeSnapshot {
               className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
               style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '79px' }}
             >
-              {ALGORITHMS.map((algo, idx) => (
-                <button
-                  key={algo.id}
-                  onClick={() => {
-                    setSelectedAlgo(algo);
-                    setIsDropdownOpen(false);
-                  }}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '10px 16px',
-                    backgroundColor: panelBg,
-                    border: 'none',
-                    borderBottom:
-                      idx < ALGORITHMS.length - 1
-                        ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
-                        : 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '14px',
-                    color:
-                      selectedAlgo?.id === algo.id
-                        ? isDark ? '#ffffff' : '#000000'
-                        : isDark ? '#cccccc' : '#000000',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = panelBg;
-                  }}
-                >
-                  <span>{algo.name}</span>
-                  <span
+              {ALGORITHMS.map((algo, idx) => {
+                const isAlgoDisabled = compareMode && disabledAlgoName === algo.name;
+                return (
+                  <button
+                    key={algo.id}
+                    onClick={() => {
+                      if (isAlgoDisabled) return;
+                      setSelectedAlgo(algo);
+                      setIsDropdownOpen(false);
+                    }}
                     style={{
-                      fontSize: '9px',
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      color: algo.badgeColor,
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 16px',
+                      backgroundColor: panelBg,
+                      border: 'none',
+                      borderBottom:
+                        idx < ALGORITHMS.length - 1
+                          ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`
+                          : 'none',
+                      cursor: isAlgoDisabled ? 'not-allowed' : 'pointer',
+                      opacity: isAlgoDisabled ? 0.35 : 1,
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      color:
+                        selectedAlgo?.id === algo.id
+                          ? isDark ? '#ffffff' : '#000000'
+                          : isDark ? '#cccccc' : '#000000',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isAlgoDisabled) {
+                        e.currentTarget.style.backgroundColor = isDark ? '#1a1a1a' : '#d5d5d5';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = panelBg;
                     }}
                   >
-                    {algo.tag}
-                  </span>
-                </button>
-              ))}
+                    <span>{algo.name}</span>
+                    <span
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        color: algo.badgeColor,
+                      }}
+                    >
+                      {algo.tag}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </motion.div>
         )}
