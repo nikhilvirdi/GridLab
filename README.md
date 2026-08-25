@@ -16,11 +16,6 @@ It started as a way to actually *see* the difference between BFS and A* instead 
 <img width="1917" height="1023" alt="Maze mode showing generated corridors" src="https://github.com/user-attachments/assets/fa435151-0790-483f-a169-8dcdb497d660" />
 <img width="1917" height="1026" alt="Comparison mode with two grids and the split stats panel" src="https://github.com/user-attachments/assets/e8a8e301-7bd9-4cc4-ac19-669a7f845c63" />
 
-<img width="802" height="1600" alt="image" src="https://github.com/user-attachments/assets/97c21c24-a501-4597-a263-728af4b0dca2" />
-<img width="807" height="1600" alt="image" src="https://github.com/user-attachments/assets/155116f8-60b6-42c3-8be8-a5d4c880789c" />
-<img width="791" height="1600" alt="image" src="https://github.com/user-attachments/assets/8beddb3d-a0ed-4f33-ac82-204d673ca2b9" />
-<img width="894" height="1599" alt="image" src="https://github.com/user-attachments/assets/35c7ca95-933f-475b-8d6f-50812da45041" />
-
 
 ## Algorithms
 
