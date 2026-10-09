@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GridCanvas } from './canvas/GridCanvas';
 import type { GridCanvasHandle } from './canvas/GridCanvas';
-import type { SolveResult } from './algorithms/types';
+import type { SolveResult } from './algorithms/grid/types';
 import { useIsMobile } from './hooks/useIsMobile';
 
 type Point = { r: number; c: number };

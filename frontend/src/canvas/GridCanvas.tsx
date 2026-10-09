@@ -3,19 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Eraser } from 'lucide-react';
 import LoaderOne from '../components/LoaderOne';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { generateMaze, generateCorridorMaze, generateClusteredTerrain, generateRiverTerrain, generateGlacierTerrain } from '../algorithms/maze';
-import { solveBFS } from '../algorithms/bfs';
-import { solveDFS } from '../algorithms/dfs';
-import { solveAStar } from '../algorithms/astar';
-import { solveJPS } from '../algorithms/jps';
-import { solveThetaStar } from '../algorithms/theta';
-import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
-import { solveGreedy } from '../algorithms/greedy';
-import { solveUCS } from '../algorithms/ucs';
-import { solveWeightedAStar } from '../algorithms/weighted-astar';
-import { solveIDAStar } from '../algorithms/ida-star';
-import { solveIDDFS } from '../algorithms/iddfs';
-import { BIOME_LIST, BIOME_MAP, getMarkerColors, type BiomeId } from '../algorithms/biomes';
+import { generateMaze, generateCorridorMaze, generateClusteredTerrain, generateRiverTerrain, generateGlacierTerrain } from '../algorithms/generation/maze';
+import { solveBFS } from '../algorithms/grid/bfs';
+import { solveDFS } from '../algorithms/grid/dfs';
+import { solveAStar } from '../algorithms/grid/astar';
+import { solveJPS } from '../algorithms/grid/jps';
+import { solveThetaStar } from '../algorithms/grid/theta';
+import { solveBidirectionalBFS } from '../algorithms/grid/bidirectional-bfs';
+import { solveGreedy } from '../algorithms/grid/greedy';
+import { solveUCS } from '../algorithms/grid/ucs';
+import { solveWeightedAStar } from '../algorithms/grid/weighted-astar';
+import { solveIDAStar } from '../algorithms/grid/ida-star';
+import { solveIDDFS } from '../algorithms/grid/iddfs';
+import { BIOME_LIST, BIOME_MAP, getMarkerColors, type BiomeId } from '../algorithms/generation/biomes';
 
 interface Point {
   r: number;
@@ -921,7 +921,7 @@ interface ModeSnapshot {
               marginTop: '8px',
               left: 0,
               width: '100%',
-              maxHeight: '83px',
+              maxHeight: '162px',
               boxSizing: 'border-box',
               overflow: 'hidden',
               borderRadius: '10px',
@@ -931,10 +931,10 @@ interface ModeSnapshot {
               zIndex: 100,
             }}
           >
-            {/* Inner scroll wrapper — separates scrolling from border-radius container; shows ~2 items */}
+            {/* Inner scroll wrapper — separates scrolling from border-radius container; shows ~4 items */}
             <div
               className={isDark ? 'custom-scroll' : 'custom-scroll-light'}
-              style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '79px' }}
+              style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: '158px' }}
             >
               {ALGORITHMS.map((algo, idx) => {
                 const isAlgoDisabled = compareMode && disabledAlgoName === algo.name;
