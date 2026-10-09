@@ -57,6 +57,8 @@ interface GridCanvasProps {
   onSelectedAlgoChange?: (algoName: string | null) => void;
   onBusyChange?: (busy: boolean) => void;
   disabledAlgoName?: string | null;
+  generationMode?: 'random' | 'corridor' | 'graph';
+  onGenerationModeChange?: (mode: 'random' | 'corridor' | 'graph') => void;
 }
 
 interface AlgorithmOption {
@@ -223,6 +225,8 @@ export const GridCanvas = forwardRef<GridCanvasHandle, GridCanvasProps>(function
   onSolveResultChange,
   onSelectedAlgoChange,
   onBusyChange,
+  generationMode: extGenMode,
+  onGenerationModeChange,
 }, ref) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const canvasRef     = useRef<HTMLCanvasElement>(null);
@@ -442,6 +446,12 @@ interface ModeSnapshot {
       }
     }
   };
+
+  useEffect(() => {
+    if (extGenMode && extGenMode !== 'graph' && extGenMode !== mazeMode) {
+      switchMazeMode(extGenMode);
+    }
+  }, [extGenMode]);
 
   const handleReroll = () => {
     if (isAnimating) return;
@@ -1079,12 +1089,23 @@ interface ModeSnapshot {
           {!compareMode && (
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '10px', width: '100%' }}>
 
-              {/* Compact mode toggle — single button, cycles random/corridor, shows current mode */}
+              {/* Compact mode toggle — cycles RANDOM -> MAZE -> GRAPH */}
               <button
-                onClick={() => switchMazeMode(mazeMode === 'random' ? 'corridor' : 'random')}
+                onClick={() => {
+                  if (mazeMode === 'random') {
+                    switchMazeMode('corridor');
+                    onGenerationModeChange?.('corridor');
+                  } else if (mazeMode === 'corridor') {
+                    if (onGenerationModeChange) {
+                      onGenerationModeChange('graph');
+                    } else {
+                      switchMazeMode('random');
+                    }
+                  }
+                }}
                 disabled={isAnimating}
-                title="Toggle grid generation mode"
-                aria-label="Toggle grid generation mode"
+                title="Toggle generation mode"
+                aria-label="Toggle generation mode"
                 style={{
                   height: '36px',
                   padding: '0 14px',

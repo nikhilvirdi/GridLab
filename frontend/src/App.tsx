@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GridCanvas } from './canvas/GridCanvas';
 import type { GridCanvasHandle } from './canvas/GridCanvas';
+import { GraphCanvas } from './canvas/GraphCanvas';
 import type { SolveResult } from './algorithms/grid/types';
 import { useIsMobile } from './hooks/useIsMobile';
 
@@ -10,6 +11,7 @@ type Point = { r: number; c: number };
 function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [view, setView] = useState<'single' | 'compare'>('single');
+  const [generationMode, setGenerationMode] = useState<'random' | 'corridor' | 'graph'>('random');
 
   // Shared state for compare view — both grids stay in sync
   const [sharedGrid, setSharedGrid] = useState<number[][]>([]);
@@ -154,7 +156,22 @@ function App() {
           width: '100%',
         }}
       >
-        <GridCanvas key="single-grid" size={50} theme={theme} />
+        {generationMode === 'graph' ? (
+          <GraphCanvas
+            key="single-graph"
+            theme={theme}
+            generationMode={generationMode}
+            onGenerationModeChange={setGenerationMode}
+          />
+        ) : (
+          <GridCanvas
+            key="single-grid"
+            size={50}
+            theme={theme}
+            generationMode={generationMode}
+            onGenerationModeChange={setGenerationMode}
+          />
+        )}
       </div>
 
       {/* Main content — compare view */}
