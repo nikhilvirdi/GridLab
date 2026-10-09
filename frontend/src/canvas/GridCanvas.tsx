@@ -11,6 +11,10 @@ import { solveJPS } from '../algorithms/jps';
 import { solveThetaStar } from '../algorithms/theta';
 import { solveBidirectionalBFS } from '../algorithms/bidirectional-bfs';
 import { solveGreedy } from '../algorithms/greedy';
+import { solveUCS } from '../algorithms/ucs';
+import { solveWeightedAStar } from '../algorithms/weighted-astar';
+import { solveIDAStar } from '../algorithms/ida-star';
+import { solveIDDFS } from '../algorithms/iddfs';
 import { BIOME_LIST, BIOME_MAP, getMarkerColors, type BiomeId } from '../algorithms/biomes';
 
 interface Point {
@@ -66,15 +70,19 @@ interface AlgorithmOption {
 
 const ALGO_SOLVERS: Record<
   string,
-  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint; allowDiagonal?: boolean; stepCost?: number }) => SolveResult
+  (req: { grid: number[][]; start: SolvePoint; end: SolvePoint; allowDiagonal?: boolean; stepCost?: number; weight?: number }) => SolveResult
 > = {
   bfs: solveBFS,
   dfs: solveDFS,
   astar: solveAStar,
+  ucs: solveUCS,
   jps: solveJPS,
   theta: solveThetaStar,
+  'weighted-astar': solveWeightedAStar,
   'bidirectional-bfs': solveBidirectionalBFS,
   greedy: solveGreedy,
+  'ida-star': solveIDAStar,
+  iddfs: solveIDDFS,
 };
 
 const ALGORITHMS: AlgorithmOption[] = [
@@ -94,6 +102,11 @@ const ALGORITHMS: AlgorithmOption[] = [
     description: 'USES HEURISTICS TO FIND THE SHORTEST PATH EFFICIENTLY. EVALUATES F(N) = G(N) + H(N).'
   },
   {
+    id: 'ucs', name: 'UCS', tag: 'CORE',
+    badgeColor: '#f5c518', badgeBg: 'rgba(245,197,24,0.08)',
+    description: 'EXPANDS NODES IN ORDER OF ACCUMULATED PATH COST G(N). GUARANTEES OPTIMAL PATH ON WEIGHTED GRIDS.'
+  },
+  {
     id: 'jps', name: 'JPS', tag: 'OPTIMIZED',
     badgeColor: '#1a7fd4', badgeBg: 'rgba(26,127,212,0.08)',
     description: 'AN OPTIMIZED VERSION OF A* FOR GRID MAPS. JUMPS OVER NODES TO SPEED UP PATH CALCULATION.'
@@ -104,6 +117,11 @@ const ALGORITHMS: AlgorithmOption[] = [
     description: 'ANY-ANGLE VERSION OF A*. USES LINE-OF-SIGHT CHECKS TO SHORTCUT PATHS FOR SMOOTHER, MORE DIRECT ROUTES. REQUIRES 8-DIRECTIONAL MOVEMENT.'
   },
   {
+    id: 'weighted-astar', name: 'WEIGHTED A*', tag: 'OPTIMIZED',
+    badgeColor: '#1a7fd4', badgeBg: 'rgba(26,127,212,0.08)',
+    description: 'BIASES SEARCH TOWARD GOAL USING F(N) = G(N) + W * H(N). TRADES OPTIMALITY FOR SPEED.'
+  },
+  {
     id: 'bidirectional-bfs', name: 'BI-BFS', tag: 'ADVANCED',
     badgeColor: '#00e676', badgeBg: 'rgba(0,230,118,0.08)',
     description: 'RUNS TWO SIMULTANEOUS BREADTH-FIRST SEARCHES FROM START AND END. MEETS IN THE MIDDLE.'
@@ -112,6 +130,16 @@ const ALGORITHMS: AlgorithmOption[] = [
     id: 'greedy', name: 'GREEDY', tag: 'ADVANCED',
     badgeColor: '#00e676', badgeBg: 'rgba(0,230,118,0.08)',
     description: 'EXPLORES NODES BASED ON HEURISTIC ESTIMATE OF DISTANCE TO END. FAST BUT NOT OPTIMAL.'
+  },
+  {
+    id: 'ida-star', name: 'IDA*', tag: 'ADVANCED',
+    badgeColor: '#00e676', badgeBg: 'rgba(0,230,118,0.08)',
+    description: 'ITERATIVE DEEPENING A*. COMBINES DFS SPACE EFFICIENCY WITH HEURISTIC SEARCH VIA COST THRESHOLDS.'
+  },
+  {
+    id: 'iddfs', name: 'IDDFS', tag: 'ADVANCED',
+    badgeColor: '#00e676', badgeBg: 'rgba(0,230,118,0.08)',
+    description: 'ITERATIVE DEEPENING DFS. RUNS SUCCESSIVE DEPTH-LIMITED PASSES TO FIND SHORTEST PATH USING LINEAR MEMORY.'
   }
 ];
 
@@ -121,10 +149,14 @@ const ALGO_COMPLEXITY: Record<string, string> = {
   bfs: 'O(V + E)',
   dfs: 'O(V + E)',
   astar: 'O(E log V)',
+  ucs: 'O(E log V)',
   jps: 'O(E log V)',
   theta: 'O(E log V)',
+  'weighted-astar': 'O(E log V)',
   'bidirectional-bfs': 'O(b^(d/2))',
   greedy: 'O(E log V)',
+  'ida-star': 'O(b^d)',
+  iddfs: 'O(b^d)',
 };
 
 /**
@@ -665,6 +697,7 @@ interface ModeSnapshot {
         end:   { row: endPoint.r,   col: endPoint.c   },
         allowDiagonal,
         stepCost: BIOME_MAP[activeBiome].cost,
+        weight: 2,
       });
 
       if (data.visitedNodes.length === 0 && data.path.length === 0 && data.nodesVisited === 0) {
