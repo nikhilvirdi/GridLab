@@ -15,9 +15,30 @@ export interface SolveRequest {
   allowDiagonal?: boolean;
   /** Movement cost per step, set by the active biome. Defaults to 1 if
    *  omitted. Only respected by algorithms that track real accumulated
-   *  path cost (A*, Theta*) — all other algorithms ignore this field. */
+   *  path cost (A*, Theta*, UCS, Weighted A*) — all other algorithms ignore this field. */
   stepCost?: number;
+  /** Heuristic weighting factor for Weighted A*. A value of 1 behaves
+   *  identically to standard A*. Higher values weight the heuristic more
+   *  heavily, trading path optimality for search speed. Defaults to 1 if
+   *  omitted. Ignored by all other algorithms. */
+  weight?: number;
 }
+
+/** Supported pathfinding algorithm identifiers. */
+export type AlgorithmId =
+  | 'bfs'
+  | 'dfs'
+  | 'astar'
+  | 'jps'
+  | 'theta'
+  | 'bidirectional-bfs'
+  | 'greedy'
+  | 'ucs'
+  | 'weighted-astar'
+  | 'ida-star'
+  | 'iddfs';
+
+export type AlgorithmType = AlgorithmId;
 
 /** Response returned by each /api/solve/* endpoint. */
 export interface SolveResult {
@@ -32,3 +53,4 @@ export interface SolveResult {
   /** Time taken in milliseconds (fractional). */
   timeTaken: number;
 }
+
