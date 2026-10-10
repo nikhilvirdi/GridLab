@@ -5,7 +5,9 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { generateGraph } from '../algorithms/graph/generator';
 import { solveDijkstra } from '../algorithms/graph/dijkstra';
 import { solveBellmanFord } from '../algorithms/graph/bellman-ford';
-import type { GraphData, GraphGenerationConfig, GraphSolveResult } from '../algorithms/graph/types';
+import { solvePrim } from '../algorithms/graph/prim';
+import { solveKruskal } from '../algorithms/graph/kruskal';
+import type { GraphData, GraphGenerationConfig, GraphSolveResult, MSTSolveResult } from '../algorithms/graph/types';
 
 const GRID_PX = 480;
 const CONTENT_W = 420;
@@ -22,13 +24,15 @@ export interface GraphCanvasProps {
 }
 
 export interface GraphAlgorithmOption {
-  id: 'dijkstra' | 'bellman-ford';
+  id: 'dijkstra' | 'bellman-ford' | 'prim' | 'kruskal';
   name: string;
-  tag: 'CORE' | 'ADVANCED';
+  tag: 'CORE' | 'ADVANCED' | 'MST';
   badgeColor: string;
   badgeBg: string;
   description: string;
   complexity: string;
+  /** True for algorithms that operate on the whole graph (no source/target). */
+  isMST?: boolean;
 }
 
 const GRAPH_ALGORITHMS: GraphAlgorithmOption[] = [
@@ -49,6 +53,26 @@ const GRAPH_ALGORITHMS: GraphAlgorithmOption[] = [
     badgeBg: 'rgba(0,230,118,0.08)',
     description: 'COMPUTES SHORTEST PATHS WHILE CORRECTLY HANDLING NEGATIVE EDGE WEIGHTS VIA V - 1 RELAXATION PASSES. DETECTS NEGATIVE-WEIGHT CYCLES.',
     complexity: 'O(V * E)',
+  },
+  {
+    id: 'prim',
+    name: "PRIM'S",
+    tag: 'MST',
+    badgeColor: '#29b6f6',
+    badgeBg: 'rgba(41,182,246,0.08)',
+    description: "GROWS A MINIMUM SPANNING TREE FROM A SINGLE SEED NODE, ALWAYS ADDING THE CHEAPEST EDGE THAT CONNECTS A NEW NODE TO THE EXISTING TREE. GREEDY FRONTIER EXPANSION VIA A MIN-HEAP.",
+    complexity: 'O(E log V)',
+    isMST: true,
+  },
+  {
+    id: 'kruskal',
+    name: "KRUSKAL'S",
+    tag: 'MST',
+    badgeColor: '#29b6f6',
+    badgeBg: 'rgba(41,182,246,0.08)',
+    description: 'SORTS ALL EDGES BY WEIGHT GLOBALLY AND GREEDILY ADDS THE CHEAPEST EDGE THAT DOES NOT FORM A CYCLE. USES UNION-FIND (PATH COMPRESSION + UNION BY RANK) FOR NEAR-O(1) CYCLE DETECTION.',
+    complexity: 'O(E log E)',
+    isMST: true,
   },
 ];
 
@@ -95,9 +119,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const [showStats, setShowStats] = useState(false);
   const [statsPanelOpen, setStatsPanelOpen] = useState(false);
 
-  // Animated visual sets for nodes and paths
+  // Animated visual sets for shortest-path algorithms (Dijkstra, Bellman-Ford)
   const [animatedVisitedSet, setAnimatedVisitedSet] = useState<Set<number>>(new Set());
   const [animatedPathNodes, setAnimatedPathNodes] = useState<number[]>([]);
+
+  // MST algorithm state (Prim's, Kruskal's)
+  const [mstResult, setMstResult] = useState<MSTSolveResult | null>(null);
+  // Edge key "from-to" currently being highlighted as "considered" (flash)
+  const [mstConsideredEdgeKey, setMstConsideredEdgeKey] = useState<string | null>(null);
+  // Set of edge keys "from-to" that have been accepted into the MST
+  const [mstAcceptedEdgeKeys, setMstAcceptedEdgeKeys] = useState<Set<string>>(new Set());
 
   const animStopRef = useRef(false);
   const speedRef = useRef(speed);
@@ -127,8 +158,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   }, []);
 
   // Auto-drive generator config based on selected graph algorithm:
-  // - Dijkstra: undirected, weighted, no negative weights
+  // - Dijkstra / Prim's / Kruskal's: undirected, weighted, no negative weights
   // - Bellman-Ford: directed, weighted, allow negative weights
+  // MST is only defined on undirected graphs; Prim's/Kruskal's share Dijkstra's config.
   const activeConfig: GraphGenerationConfig = useMemo(() => {
     if (selectedAlgo?.id === 'bellman-ford') {
       return { directed: true, weighted: true, allowNegativeWeights: true, ...customConfig };
@@ -151,7 +183,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     [graph.nodes]
   );
 
-  // Reset graph solver state
+  // Reset graph solver state (covers both SP and MST algorithms)
   const clearRunState = () => {
     animStopRef.current = true;
     if (timeoutRef.current !== null) {
@@ -159,9 +191,14 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       timeoutRef.current = null;
     }
     setIsAnimating(false);
+    // SP state
     setAnimatedVisitedSet(new Set());
     setAnimatedPathNodes([]);
     setSolveResult(null);
+    // MST state
+    setMstResult(null);
+    setMstConsideredEdgeKey(null);
+    setMstAcceptedEdgeKeys(new Set());
     setShowStats(false);
     setStatsPanelOpen(false);
   };
@@ -181,10 +218,12 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }
   };
 
-  // Click on a graph node to set source then target
+  // Click on a graph node to set source then target.
+  // Disabled entirely for MST algorithms — they operate on the whole graph.
   const handleNodeClick = (nodeId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (isAnimating) return;
+    if (selectedAlgo?.isMST) return; // MST has no source/target concept
 
     if (source === null) {
       setSource(nodeId);
@@ -256,19 +295,87 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     timeoutRef.current = window.setTimeout(() => animateVisited(0), 40);
   };
 
+  // MST animation runner — steps through consideredOrder edge by edge,
+  // flashing each edge as "being evaluated" then locking accepted ones as gold.
+  const runMSTAnimation = (data: MSTSolveResult) => {
+    animStopRef.current = false;
+    setIsAnimating(true);
+    setShowStats(false);
+    setStatsPanelOpen(false);
+    setMstConsideredEdgeKey(null);
+    setMstAcceptedEdgeKeys(new Set());
+
+    // Build a set of accepted edge keys for O(1) lookup during animation.
+    // We store both directions (a-b and b-a) so the SVG renderer can match
+    // edges regardless of which endpoint is listed first in graph.edges.
+    const acceptedSet = new Set<string>();
+    for (const e of data.acceptedEdges) {
+      acceptedSet.add(`${e.from}-${e.to}`);
+      acceptedSet.add(`${e.to}-${e.from}`);
+    }
+
+    const liveAccepted = new Set<string>();
+
+    const animateStep = (idx: number) => {
+      if (animStopRef.current) {
+        setIsAnimating(false);
+        return;
+      }
+
+      if (idx >= data.consideredOrder.length) {
+        // Animation complete — clear the flash highlight, leave accepted edges lit.
+        setMstConsideredEdgeKey(null);
+        setMstAcceptedEdgeKeys(new Set(liveAccepted));
+        setIsAnimating(false);
+        setShowStats(true);
+        return;
+      }
+
+      const edge = data.consideredOrder[idx];
+      const key = `${edge.from}-${edge.to}`;
+
+      // Flash this edge as "being evaluated"
+      setMstConsideredEdgeKey(key);
+
+      // If it was accepted, lock it into the accepted set immediately so it
+      // stays highlighted even as the flash moves to the next edge.
+      if (acceptedSet.has(key)) {
+        liveAccepted.add(key);
+        liveAccepted.add(`${edge.to}-${edge.from}`);
+        setMstAcceptedEdgeKeys(new Set(liveAccepted));
+      }
+
+      const delay = SPEED_DELAY[speedRef.current];
+      timeoutRef.current = window.setTimeout(() => animateStep(idx + 1), delay);
+    };
+
+    timeoutRef.current = window.setTimeout(() => animateStep(0), 40);
+  };
+
   // Run solver
   const handleRun = () => {
-    if (source === null || !selectedAlgo || isAnimating) return;
+    if (!selectedAlgo || isAnimating) return;
 
-    const solver = selectedAlgo.id === 'dijkstra' ? solveDijkstra : solveBellmanFord;
-    const result = solver({
-      graph,
-      source,
-      target: target ?? undefined,
-    });
-
-    setSolveResult(result);
-    runAnimation(result, target ?? undefined);
+    if (selectedAlgo.isMST) {
+      // MST algorithms — no source/target needed
+      const solver = selectedAlgo.id === 'prim' ? solvePrim : solveKruskal;
+      const result = solver({ graph });
+      setMstResult(result);
+      setSolveResult(null);
+      runMSTAnimation(result);
+    } else {
+      // Shortest-path algorithms — require a source node
+      if (source === null) return;
+      const solver = selectedAlgo.id === 'dijkstra' ? solveDijkstra : solveBellmanFord;
+      const result = solver({
+        graph,
+        source,
+        target: target ?? undefined,
+      });
+      setSolveResult(result);
+      setMstResult(null);
+      runAnimation(result, target ?? undefined);
+    }
   };
 
   // Stop button during animation
@@ -313,7 +420,12 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const gridLineColor = isDark ? '#1a1a1a' : 'rgba(0,0,0,0.08)';
 
   const nodeRadius = 16;
-  const isRunDisabled = source === null || !selectedAlgo || isAnimating;
+  // MST algorithms only need a selected algorithm — no source required.
+  // SP algorithms also require a source node.
+  const isRunDisabled = !selectedAlgo || isAnimating ||
+    (!selectedAlgo.isMST && source === null);
+
+  const isMSTMode = selectedAlgo?.isMST === true;
 
   // Check if an edge is part of the highlighted shortest path
   const isEdgeOnPath = (u: number, v: number, directed?: boolean): boolean => {
@@ -438,7 +550,25 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 const v = nodeMap.get(edge.to);
                 if (!u || !v) return null;
 
+                // ── Shortest-path coloring (Dijkstra / Bellman-Ford) ──
                 const onPath = isEdgeOnPath(edge.from, edge.to, edge.directed);
+
+                // ── MST coloring (Prim's / Kruskal's) ──
+                const edgeKeyFwd = `${edge.from}-${edge.to}`;
+                const edgeKeyRev = `${edge.to}-${edge.from}`;
+                const isMSTAccepted = mstAcceptedEdgeKeys.has(edgeKeyFwd) || mstAcceptedEdgeKeys.has(edgeKeyRev);
+                const isMSTConsidered =
+                  !isMSTAccepted &&
+                  (mstConsideredEdgeKey === edgeKeyFwd || mstConsideredEdgeKey === edgeKeyRev);
+
+                // Resolved stroke: MST accepted = cyan-green (#29b6f6),
+                // MST currently considered (flash) = muted blue (#1a7fd4),
+                // SP path = gold (#f5c518), default = borderColor.
+                let edgeStroke = borderColor;
+                let edgeWidth = '2';
+                if (isMSTAccepted) { edgeStroke = '#29b6f6'; edgeWidth = '3.5'; }
+                else if (isMSTConsidered) { edgeStroke = '#1a7fd4'; edgeWidth = '2.5'; }
+                else if (onPath) { edgeStroke = '#f5c518'; edgeWidth = '3.5'; }
 
                 const dx = v.x - u.x;
                 const dy = v.y - u.y;
@@ -458,6 +588,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 const kw = Math.max(14, weightStr.length * 8 + 6);
                 const kh = 14;
 
+                // Weight label color: match the edge highlight state
+                const weightTextFill = isMSTAccepted
+                  ? '#29b6f6'
+                  : isMSTConsidered
+                  ? '#1a7fd4'
+                  : onPath
+                  ? '#f5c518'
+                  : isDark ? '#f5c518' : '#b45309';
+
                 return (
                   <g key={`edge-${edge.from}-${edge.to}-${idx}`}>
                     <line
@@ -465,8 +604,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                       y1={y1}
                       x2={x2}
                       y2={y2}
-                      stroke={onPath ? '#f5c518' : borderColor}
-                      strokeWidth={onPath ? '3.5' : '2'}
+                      stroke={edgeStroke}
+                      strokeWidth={edgeWidth}
                       strokeLinecap="round"
                       markerEnd={
                         edge.directed
@@ -496,7 +635,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                           dominantBaseline="central"
                           fontSize="11"
                           fontWeight="700"
-                          fill={onPath ? '#f5c518' : (isDark ? '#f5c518' : '#b45309')}
+                          fill={weightTextFill}
                           fontFamily="inherit"
                         >
                           {edge.weight}
@@ -509,8 +648,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
               {/* Graph Nodes */}
               {graph.nodes.map((node) => {
-                const isSource = source === node.id;
-                const isTarget = target === node.id;
+                const isSource = !isMSTMode && source === node.id;
+                const isTarget = !isMSTMode && target === node.id;
                 const isPath = animatedPathNodes.includes(node.id) && !isSource && !isTarget;
                 const isVisited = animatedVisitedSet.has(node.id) && !isSource && !isTarget && !isPath;
 
@@ -541,7 +680,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                     key={`node-${node.id}`}
                     transform={`translate(${node.x}, ${node.y})`}
                     onClick={(e) => handleNodeClick(node.id, e)}
-                    style={{ cursor: isAnimating ? 'default' : 'pointer' }}
+                    style={{ cursor: (isAnimating || isMSTMode) ? 'default' : 'pointer' }}
                   >
                     <circle
                       r={nodeRadius}
@@ -935,7 +1074,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
           {/* See Stats button + stats panel (post-run only) */}
           <AnimatePresence>
-            {showStats && solveResult && (
+            {showStats && (solveResult || mstResult) && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -1006,86 +1145,126 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                         </>
                       )}
 
-                      {/* Negative cycle alert (Bellman-Ford only) */}
-                      {solveResult.negativeCycleDetected && (
-                        <div
-                          style={{
-                            padding: '10px 14px',
-                            borderRadius: '8px',
-                            backgroundColor: 'rgba(255,23,68,0.12)',
-                            border: '1px solid rgba(255,23,68,0.4)',
-                            marginBottom: '16px',
-                          }}
-                        >
-                          <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#ff1744' }}>
-                            NEGATIVE-WEIGHT CYCLE DETECTED
-                          </p>
-                          <p style={{ margin: 0, fontSize: '11px', color: isDark ? '#ff8a80' : '#c62828', lineHeight: 1.4 }}>
-                            Shortest paths are undefined because a negative-weight cycle exists in the graph.
-                          </p>
-                        </div>
+                      {/* ── Shortest-path stats (Dijkstra / Bellman-Ford) ── */}
+                      {solveResult && (
+                        <>
+                          {/* Negative cycle alert — Bellman-Ford only */}
+                          {solveResult.negativeCycleDetected && (
+                            <div
+                              style={{
+                                padding: '10px 14px',
+                                borderRadius: '8px',
+                                backgroundColor: 'rgba(255,23,68,0.12)',
+                                border: '1px solid rgba(255,23,68,0.4)',
+                                marginBottom: '16px',
+                              }}
+                            >
+                              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#ff1744' }}>
+                                NEGATIVE-WEIGHT CYCLE DETECTED
+                              </p>
+                              <p style={{ margin: 0, fontSize: '11px', color: isDark ? '#ff8a80' : '#c62828', lineHeight: 1.4 }}>
+                                Shortest paths are undefined because a negative-weight cycle exists in the graph.
+                              </p>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            {[
+                              { label: 'Nodes Visited', value: String(solveResult.visitedOrder.length) },
+                              ...(target !== null && !solveResult.negativeCycleDetected
+                                ? [
+                                    {
+                                      label: 'Path Cost',
+                                      value:
+                                        solveResult.distances[target] === Infinity
+                                          ? 'Unreachable'
+                                          : String(solveResult.distances[target]),
+                                    },
+                                  ]
+                                : []),
+                              { label: 'Time Taken', value: `${solveResult.timeTaken.toFixed(2)}ms` },
+                              { label: 'Complexity', value: selectedAlgo ? selectedAlgo.complexity : '—' },
+                            ].map((row, idx, arr) => (
+                              <div
+                                key={row.label}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  height: '52px',
+                                  minHeight: '52px',
+                                  borderBottom: idx < arr.length - 1 ? `1px solid ${borderColor}` : 'none',
+                                }}
+                              >
+                                <span style={{ fontSize: '15px', color: isDark ? '#888888' : '#000000', fontFamily: 'inherit' }}>
+                                  {row.label}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: '16px',
+                                    color: isDark ? '#ffffff' : '#000000',
+                                    fontFamily: 'inherit',
+                                    padding: '4px 14px',
+                                    borderRadius: '6px',
+                                    border: `1px solid ${borderColor}`,
+                                    backgroundColor: valueBoxBg,
+                                    minWidth: '48px',
+                                    textAlign: 'center',
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {row.value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
                       )}
 
-                      {/* Stats Metrics Table */}
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        {[
-                          { label: 'Nodes Visited', value: String(solveResult.visitedOrder.length) },
-                          ...(target !== null && !solveResult.negativeCycleDetected
-                            ? [
-                                {
-                                  label: 'Path Cost',
-                                  value:
-                                    solveResult.distances[target] === Infinity
-                                      ? 'Unreachable'
-                                      : String(solveResult.distances[target]),
-                                },
-                              ]
-                            : []),
-                          { label: 'Time Taken', value: `${solveResult.timeTaken.toFixed(2)}ms` },
-                          { label: 'Complexity', value: selectedAlgo ? selectedAlgo.complexity : '—' },
-                        ].map((row, idx, arr) => (
-                          <div
-                            key={row.label}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              height: '52px',
-                              minHeight: '52px',
-                              borderBottom:
-                                idx < arr.length - 1
-                                  ? `1px solid ${borderColor}`
-                                  : 'none',
-                            }}
-                          >
-                            <span
+                      {/* ── MST stats (Prim's / Kruskal's) ── */}
+                      {mstResult && (
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          {([
+                            { label: 'Total Weight', value: String(mstResult.totalWeight) },
+                            { label: 'Edges Accepted', value: String(mstResult.acceptedEdges.length) },
+                            { label: 'Edges Considered', value: String(mstResult.consideredOrder.length) },
+                            { label: 'Time Taken', value: `${mstResult.timeTaken.toFixed(2)}ms` },
+                            { label: 'Complexity', value: selectedAlgo ? selectedAlgo.complexity : '—' },
+                          ] as { label: string; value: string }[]).map((row, idx, arr) => (
+                            <div
+                              key={row.label}
                               style={{
-                                fontSize: '15px',
-                                color: isDark ? '#888888' : '#000000',
-                                fontFamily: 'inherit',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                height: '52px',
+                                minHeight: '52px',
+                                borderBottom: idx < arr.length - 1 ? `1px solid ${borderColor}` : 'none',
                               }}
                             >
-                              {row.label}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: '16px',
-                                color: isDark ? '#ffffff' : '#000000',
-                                fontFamily: 'inherit',
-                                padding: '4px 14px',
-                                borderRadius: '6px',
-                                border: `1px solid ${borderColor}`,
-                                backgroundColor: valueBoxBg,
-                                minWidth: '48px',
-                                textAlign: 'center',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {row.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                              <span style={{ fontSize: '15px', color: isDark ? '#888888' : '#000000', fontFamily: 'inherit' }}>
+                                {row.label}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: '16px',
+                                  color: isDark ? '#ffffff' : '#000000',
+                                  fontFamily: 'inherit',
+                                  padding: '4px 14px',
+                                  borderRadius: '6px',
+                                  border: `1px solid ${borderColor}`,
+                                  backgroundColor: valueBoxBg,
+                                  minWidth: '48px',
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {row.value}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1093,116 +1272,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Graph Specification Card */}
-          <div
-            style={{
-              width: '100%',
-              borderRadius: '12px',
-              border: `2px solid ${borderColor}`,
-              backgroundColor: panelBg,
-              padding: '20px',
-              overflow: 'hidden',
-              boxSizing: 'border-box',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <p
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: isDark ? '#ffffff' : '#000000',
-                  margin: 0,
-                  fontFamily: 'inherit',
-                }}
-              >
-                Planar Delaunay Graph
-              </p>
-              <span
-                style={{
-                  fontSize: '10px',
-                  padding: '3px 8px',
-                  borderRadius: '5px',
-                  backgroundColor: 'rgba(26,127,212,0.1)',
-                  color: '#1a7fd4',
-                  fontWeight: 700,
-                  letterSpacing: '0.05em',
-                }}
-              >
-                {activeConfig.directed ? 'DIRECTED' : 'UNDIRECTED'}
-              </span>
-            </div>
-            <p
-              style={{
-                fontSize: '13px',
-                color: isDark ? '#888888' : '#555555',
-                margin: '0 0 20px 0',
-                lineHeight: 1.5,
-                fontFamily: 'inherit',
-              }}
-            >
-              Procedurally generated 2D planar graph with zero edge crossings. Click any node to set Start (green), then click a second node to set Target (red).
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {[
-                { label: 'Vertices (Nodes)', value: String(graph.nodes.length) },
-                { label: 'Edges', value: String(graph.edges.length) },
-                { label: 'Planar Crossings', value: '0 (None)' },
-                {
-                  label: 'Edge Weights',
-                  value: activeConfig.weighted
-                    ? activeConfig.allowNegativeWeights
-                      ? '-10 to 20'
-                      : '1 to 20'
-                    : 'Unweighted',
-                },
-                { label: 'Start Node', value: source !== null ? `Node ${source}` : 'Not set' },
-                { label: 'Target Node', value: target !== null ? `Node ${target}` : 'Optional' },
-              ].map((row, idx, arr) => (
-                <div
-                  key={row.label}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    height: '46px',
-                    minHeight: '46px',
-                    borderBottom:
-                      idx < arr.length - 1
-                        ? `1px solid ${borderColor}`
-                        : 'none',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '14px',
-                      color: isDark ? '#888888' : '#000000',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    {row.label}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: isDark ? '#ffffff' : '#000000',
-                      fontFamily: 'inherit',
-                      padding: '3px 12px',
-                      borderRadius: '6px',
-                      border: `1px solid ${borderColor}`,
-                      backgroundColor: valueBoxBg,
-                      minWidth: '40px',
-                      textAlign: 'center',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {row.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
