@@ -58,3 +58,52 @@ export interface GraphSolveResult {
   timeTaken: number;
 }
 
+// ─── MST algorithm types ──────────────────────────────────────────────────────
+// These are kept separate from GraphSolveRequest/GraphSolveResult because MST
+// algorithms have fundamentally different semantics: no single source/target,
+// no per-node distance map, and the output is a set of edges rather than a path.
+
+/**
+ * A single edge as evaluated or accepted by an MST algorithm.
+ * Mirrors the shape of GraphEdge but with weight required (MST is only defined
+ * on weighted graphs) and no directed flag (MST treats all edges as undirected).
+ */
+export interface MSTEdge {
+  /** Id of one endpoint of the edge. */
+  from: number;
+  /** Id of the other endpoint of the edge. */
+  to: number;
+  /** Edge weight (always present for MST algorithms). */
+  weight: number;
+}
+
+/**
+ * Request sent to MST algorithm solvers (Prim's, Kruskal's).
+ * Only the graph is needed — MST considers all nodes simultaneously;
+ * there is no source or target.
+ */
+export interface MSTSolveRequest {
+  /** The complete planar graph data structure (nodes and edges). */
+  graph: GraphData;
+}
+
+/**
+ * Result returned by MST algorithm solvers (Prim's, Kruskal's).
+ */
+export interface MSTSolveResult {
+  /**
+   * Every edge the algorithm evaluated, in the order it evaluated them.
+   * Includes both accepted and rejected edges — analogous to visitedOrder
+   * in GraphSolveResult, used to drive the step-by-step animation.
+   */
+  consideredOrder: MSTEdge[];
+  /**
+   * The edges that were accepted into the MST, in the order they were accepted.
+   * For a connected graph with V nodes this will contain exactly V - 1 edges.
+   */
+  acceptedEdges: MSTEdge[];
+  /** Sum of the weights of all acceptedEdges — the total cost of the MST. */
+  totalWeight: number;
+  /** Execution time in milliseconds (fractional). */
+  timeTaken: number;
+}
